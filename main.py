@@ -3,6 +3,7 @@ from tabs.setting import setting
 from tabs.completion import completion
 from tabs.chat import chat
 from tabs.simulate import simulate
+from tabs.likelihood import likelihood
 
 if __name__ == "__main__":
     import argparse
@@ -18,8 +19,8 @@ if __name__ == "__main__":
     completion_interface = completion()
     setting_interface = setting(args.model_dir)
     simulate_interface = simulate()
-    
+    likelihood_interface = likelihood()
 
-    demo = gr.TabbedInterface([chat_interface, completion_interface, simulate_interface, setting_interface], ["Chat", "Completion", "Simulate", "Setting"], theme=gr.themes.Base())
+    demo = gr.TabbedInterface([chat_interface, completion_interface, simulate_interface, likelihood_interface, setting_interface], ["Chat", "Completion", "Simulate", "Likelihood_interface", "Setting"], theme=gr.themes.Base())
 
     demo.launch(share = args.share)

@@ -2,6 +2,8 @@ from llama_cpp import Llama
 import gradio as gr
 import os
 from dataclasses import dataclass
+import torch
+import numpy as np
 
 model = None
 
@@ -52,6 +54,26 @@ def generate(prompt):
     ):
         yield chunk["choices"][0]["text"]
 
+def eval(prompt, output):
+    global model, config
+    model.reset()
+    prompt_tokens = model.tokenize(prompt.encode("utf-8"), special=True)
+    output_tokens = model.tokenize(output.encode("utf-8"), add_bos=False, special=True)
+    tokens = prompt_tokens + output_tokens
+    model.eval(tokens)
+    
+    logprobs = Llama.logits_to_logprobs(model.eval_logits)
+    model.reset()
+
+    logprobs_target = logprobs[range(len(prompt_tokens)-1, len(tokens)-1), torch.tensor(output_tokens)]
+    log_likelihood = logprobs_target.sum()
+    likelihood = np.exp(log_likelihood)
+
+    print(f"{output}:\n  Likelihood: {likelihood}\n  Log Likelihood: {log_likelihood}")
+
+    return likelihood, log_likelihood
+
+
 def get_prompt(user, post_prompt = None):
     if post_prompt:
         prompt = post_prompt
@@ -99,28 +121,31 @@ def setting(model_dir):
             ngl = gr.Slider(label="n_gpu_layers", minimum=0, maximum=256, step=1, value=256)
             ctx = gr.Slider(label="n_ctx", minimum=256, maximum=65536, step=256, value = 4096)
             ts = gr.Textbox(label="tensor_split")
+            n_batch = gr.Slider(label="n_batch", minimum=32, maximum=4096, step=32, value=512)
             output = gr.Textbox(label="output", value="")
 
             with gr.Row():
                 load_button = gr.Button(value="Load", variant="primary")
                 clear_button = gr.Button(value="Clear", variant="secondary")
 
-        def load_model(model_name, ngl, ctx, ts):
+        def load_model(model_name, ngl, ctx, ts, n_batch):
             global model
             model_path = os.path.join(model_dir, model_name)
             ts = [float(x) for x in ts.split(",")] if ts else None
             model = Llama(
                 model_path=model_path,
                 n_gpu_layers=ngl,
+                n_batch=n_batch,
                 tensor_split=ts,
                 n_ctx=ctx,
+                logits_all = True,
             )
 
             return "Model loaded successfully."
 
         load_button.click(
             load_model,
-            inputs=[model_name, ngl, ctx, ts],
+            inputs=[model_name, ngl, ctx, ts, n_batch],
             outputs=[output],
         )
 
