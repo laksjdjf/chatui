@@ -3,22 +3,17 @@ from tabs.setting import eval, get_prompt
 import pandas as pd
 
 def likelihood_handler(prompt, *outputs):
-    global pre_prompt, stop_generate
 
-    result = {}
-    log_likelihoods = []
-
-    for output in outputs:
-        if output:
-            likelihood, log_likelihood = eval(prompt, output)
-            result[output] = (likelihood)
-            log_likelihoods.append(log_likelihood)
+    outputs = [output for output in outputs if output] # remove empty outputs
+    likelihoods, log_likelihoods, num_tokens = eval(prompt, outputs)
 
     df = pd.DataFrame(
-        {"output": list(result.keys()), "likelihood": list(result.values()), "log_likelihood": log_likelihoods}
+        {"output": outputs, "likelihood": likelihoods, "log_likelihood": log_likelihoods, "num_tokens": num_tokens}
     )
 
-    return df, result
+    result = {output: likelihood for output, likelihood in zip(outputs, likelihoods)}
+
+    return df.round(3), result
 
 def update_prompt(user, post_prompt=None):
     prompt = get_prompt(user, post_prompt)
@@ -31,18 +26,18 @@ def likelihood():
         with gr.Row():
             with gr.Column():
                 prompt_textbox = gr.Textbox(
-                    label="Input/Output",
+                    label="Input",
                     placeholder="Enter your prompt here...",
                     interactive=True,
                     elem_classes=["prompt"],
                     lines=3,
                 )
                 
-                user_textbox = gr.Textbox(label="user", value="こんにちんぽ", lines=2)
+                
                 default_button = gr.Button("Default")
-
                 eval_button = gr.Button("Evaluation", variant="primary")
 
+                user_textbox = gr.Textbox(label="input for default button", value="こんにちんぽ", lines=2)
                 with gr.Group():
                     targets = [
                         gr.Textbox(
@@ -55,7 +50,7 @@ def likelihood():
 
             with gr.Column():
                 dataframe = gr.Dataframe(
-                    headers=["output", "likelihood", "log_likelihood"],
+                    headers=["output", "likelihood", "log_likelihood", "num_tokens"],
                     datatype=["str", "number", "number"],
                     row_count=5,
                 )

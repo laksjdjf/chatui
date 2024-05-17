@@ -54,24 +54,40 @@ def generate(prompt):
     ):
         yield chunk["choices"][0]["text"]
 
-def eval(prompt, output):
+def eval(input, outputs):
     global model, config
-    model.reset()
-    prompt_tokens = model.tokenize(prompt.encode("utf-8"), special=True)
-    output_tokens = model.tokenize(output.encode("utf-8"), add_bos=False, special=True)
-    tokens = prompt_tokens + output_tokens
-    model.eval(tokens)
-    
-    logprobs = Llama.logits_to_logprobs(model.eval_logits)
-    model.reset()
+    input_tokens = model.tokenize(input.encode("utf-8"), special=True)
 
-    logprobs_target = logprobs[range(len(prompt_tokens)-1, len(tokens)-1), torch.tensor(output_tokens)]
-    log_likelihood = logprobs_target.sum()
-    likelihood = np.exp(log_likelihood)
+    if model._input_ids.tolist() != input_tokens: # reset and eval if input has changed
+        model.reset()
+        model.eval(input_tokens)
 
-    print(f"{output}:\n  Likelihood: {likelihood}\n  Log Likelihood: {log_likelihood}")
+    log_likelihoods = []
+    likelihoods = []
+    num_tokens = []
 
-    return likelihood, log_likelihood
+    for output in outputs:
+        output_tokens = model.tokenize(output.encode("utf-8"), add_bos=False, special=True)
+        model.eval(output_tokens)
+        
+        logprobs = Llama.logits_to_logprobs(model.eval_logits)
+        model.reset()
+
+        # inputの最後から、outputの最後から二番目まで
+        logprobs_target = logprobs[range(len(input_tokens)-1, len(input_tokens) + len(output_tokens) - 1), torch.tensor(output_tokens)]
+        
+        log_likelihood = logprobs_target.sum()
+        likelihood = np.exp(log_likelihood)
+
+        log_likelihoods.append(log_likelihood.item())
+        likelihoods.append(likelihood.item())
+        num_tokens.append(len(output_tokens))
+
+        model.n_tokens = len(input_tokens) # inputまで評価した状態に戻す。
+
+        print(f"{output}:\n  Likelihood: {likelihood:.3f}\n  Log Likelihood: {log_likelihood:.3f}\n num_tokens: {len(output_tokens)})")
+
+    return likelihoods, log_likelihoods, num_tokens
 
 
 def get_prompt(user, post_prompt = None):
