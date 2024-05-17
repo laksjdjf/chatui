@@ -12,11 +12,13 @@ def chat_handler(history, system_a, system_b, first_message, n_completion):
     stop_generate = False
 
     if len(history) > 0:
-        first_message = history[-1][1]
+        chat_b = history[-1][1]
+    else:
+        chat_b = first_message
 
     for i in range(n_completion):
-        chat_a, chat_b = "", ""
-        prompt = get_prompt_for_simulation(history, system_a, first_message)
+        chat_a = ""
+        prompt = get_prompt_for_simulation(history, system_a, chat_b)
         
         if stop_generate:
             break
@@ -30,6 +32,7 @@ def chat_handler(history, system_a, system_b, first_message, n_completion):
         
         prompt = get_prompt_for_simulation(history, system_b, chat_a, swap=True)
 
+        chat_b = ""
         for text in generate(prompt):
             if stop_generate:
                 break
@@ -62,7 +65,7 @@ def simulate(user_avatar=None, chatbot_avatar=None):
                     system_a = gr.Textbox(label="System A", placeholder="Enter your message here...", lines=3)
                 with gr.Group():
                     name_b = gr.Textbox(label="Name B", placeholder="Enter your name here...", lines=1)
-                    system_b = gr.Textbox(label="System A", placeholder="Enter your message here...", lines=3)
+                    system_b = gr.Textbox(label="System B", placeholder="Enter your message here...", lines=3)
             first_message = gr.Textbox(label="First message", placeholder="Enter your message here...", lines=2)
             swap_button = gr.Button("Swap")
 
