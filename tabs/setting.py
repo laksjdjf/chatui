@@ -54,7 +54,7 @@ def generate(prompt):
     ):
         yield chunk["choices"][0]["text"]
 
-def eval(input, outputs):
+def eval_output(input, outputs):
     global model, config
     input_tokens = model.tokenize(input.encode("utf-8"), special=True)
 
@@ -89,6 +89,34 @@ def eval(input, outputs):
 
     return likelihoods, log_likelihoods, num_tokens
 
+def eval_text(text, threshold):
+    global model, config
+    tokens = model.tokenize(text.encode("utf-8"), special=True)
+
+    if model._input_ids.tolist() != tokens: # reset and eval if input has changed
+        model.reset()
+        model.eval(tokens)
+    
+    logprobs = Llama.logits_to_logprobs(model.eval_logits)
+
+    print(logprobs.shape)
+    logprobs_target = logprobs[range(0, len(tokens) - 1), torch.tensor(tokens[1:])]
+    logprobs_max = logprobs.max(axis=1)[:1]
+
+    typo = logprobs_target < (logprobs_max + np.log(threshold))
+    typo = typo.tolist()
+    
+    log_likelihood = logprobs_target.sum()
+    perplexity = np.exp(-log_likelihood / (len(tokens) - 1))
+    
+    text_splited = []
+    for x in tokens[1:]:
+        try:
+            text_splited.append(model.detokenize([x]).decode("utf-8"))
+        except:
+            text_splited.append("◆")
+
+    return perplexity, typo, text_splited
 
 def get_prompt(user, post_prompt = None):
     if post_prompt:

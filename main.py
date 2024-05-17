@@ -4,6 +4,7 @@ from tabs.completion import completion
 from tabs.chat import chat
 from tabs.simulate import simulate
 from tabs.likelihood import likelihood
+from tabs.typo_checker import typo_checker
 
 if __name__ == "__main__":
     import argparse
@@ -20,7 +21,26 @@ if __name__ == "__main__":
     setting_interface = setting(args.model_dir)
     simulate_interface = simulate()
     likelihood_interface = likelihood()
+    typo_checker_interface = typo_checker()
 
-    demo = gr.TabbedInterface([chat_interface, completion_interface, simulate_interface, likelihood_interface, setting_interface], ["Chat", "Completion", "Simulate", "Likelihood", "Setting"], theme=gr.themes.Base())
+    demo = gr.TabbedInterface(
+        [
+            chat_interface, 
+            completion_interface, 
+            simulate_interface, 
+            likelihood_interface, 
+            typo_checker_interface, 
+            setting_interface
+        ], 
+        [
+            "Chat", 
+            "Completion",
+            "Simulate", 
+            "Likelihood",
+            "Typo Checker",
+            "Setting"
+        ],
+        theme=gr.themes.Base()
+    )
 
     demo.launch(share = args.share)

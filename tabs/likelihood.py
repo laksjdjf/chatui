@@ -1,11 +1,11 @@
 import gradio as gr
-from tabs.setting import eval, get_prompt
+from tabs.setting import eval_output, get_prompt
 import pandas as pd
 
 def likelihood_handler(prompt, *outputs):
 
     outputs = [output for output in outputs if output] # remove empty outputs
-    likelihoods, log_likelihoods, num_tokens = eval(prompt, outputs)
+    likelihoods, log_likelihoods, num_tokens = eval_output(prompt, outputs)
 
     df = pd.DataFrame(
         {"output": outputs, "likelihood": likelihoods, "log_likelihood": log_likelihoods, "num_tokens": num_tokens}
