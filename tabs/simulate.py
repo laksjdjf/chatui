@@ -48,8 +48,14 @@ def undo_history(history):
     return history[:-1]
 
 def view(history, name_a, name_b):
-    return "\n\n".join([f'<div style="color: navy">{name_a}:{user.replace("\n", "")}</div>\n\n<div style="color: maroon">{name_b}:{chatbot.replace("\n", "")}</div>' for user, chatbot in history])
+    text = ""
+    for user, chatbot in history:
+        user_no_newline = user.replace("\n", "")
+        chatbot_no_newline = chatbot.replace("\n", "")
 
+        text += f'<div style="color: navy">{name_a}:{user_no_newline}</div>\n\n<div style="color: maroon">{name_b}:{chatbot_no_newline}</div>'
+
+    return text
 def swap(name_a, name_b, system_a, system_b):
     return name_b, name_a, system_b, system_a
 

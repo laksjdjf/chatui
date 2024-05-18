@@ -33,7 +33,15 @@ def undo_history(history):
 
 def view(history):
     return "\n\n".join([f'<div style="color: navy">user:{user.replace("\n", "")}</div>\n\n<div style="color: maroon">chatbot:{chatbot.replace("\n", "")}</div>' for user, chatbot in history])
+    text = ""
+    for user, chatbot in history:
+        user_no_newline = user.replace("\n", "")
+        chatbot_no_newline = chatbot.replace("\n", "")
 
+        text += f'<div style="color: navy">user:{user_no_newline}</div>\n\n<div style="color: maroon">chatbot:{chatbot_no_newline}</div>'
+
+    return text
+    
 def chat(user_avatar=None, chatbot_avatar=None):
     with gr.Blocks() as chat_interface:
         gr.Markdown("Chat用タブです。Shift+Enterでも送信できます。")
