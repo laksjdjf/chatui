@@ -20,7 +20,7 @@ def chat_handler(history_b, system_a, system_b, first_message, n_completion):
 
     for i in range(n_completion):
         chat_a = ""
-        prompt = get_prompt_for_simulation(history_a, system_a, chat_b, swap=True)
+        prompt = get_prompt_for_simulation(history_a, system_a, chat_b)
         
         if stop_generate:
             break

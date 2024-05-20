@@ -143,15 +143,11 @@ def get_prompt_from_history(history, user=None, chatbot_beginning=None):
 
     return prompt
 
-def get_prompt_for_simulation(history, system, user, swap=False):
+def get_prompt_for_simulation(history, system, user):
     prompt = config.system_template.format(system=system)
     for i, (us, cb) in enumerate(history):
-        if not swap:
-            prompt += config.user_template.format(user=us)
-            prompt += config.chatbot_template.format(chatbot=cb)
-        else:
-            prompt += config.chatbot_template.format(chatbot=us)
-            prompt += config.user_template.format(user=cb)
+        prompt += config.user_template.format(user=us)
+        prompt += config.chatbot_template.format(chatbot=cb)
 
     prompt += config.user_template.format(user=user)
     prompt += config.chatbot_template.split("{chatbot}")[0]
