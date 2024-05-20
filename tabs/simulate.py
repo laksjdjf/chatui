@@ -7,18 +7,20 @@ def stop():
     global stop_generate
     stop_generate = True
 
-def chat_handler(history, system_a, system_b, first_message, n_completion):
+def chat_handler(history_b, system_a, system_b, first_message, n_completion):
     global stop_generate
     stop_generate = False
 
-    if len(history) > 0:
-        chat_b = history[-1][1]
+    if len(history_b) > 0:
+        chat_b = history_b[-1][1]
+        history_a = [(first_message, history_b[0][0])] + [(history_b[i-1][1], history_b[i][0]) for i in range(1, len(history_b))]
     else:
         chat_b = first_message
+        history_a = []
 
     for i in range(n_completion):
         chat_a = ""
-        prompt = get_prompt_for_simulation(history, system_a, chat_b)
+        prompt = get_prompt_for_simulation(history_a, system_a, chat_b, swap=True)
         
         if stop_generate:
             break
@@ -28,21 +30,23 @@ def chat_handler(history, system_a, system_b, first_message, n_completion):
                 break
 
             chat_a += text
-            yield history + [(chat_a, "")], gr.update(visible=False), gr.update(visible=True)
+            yield history_b + [(chat_a, "")], gr.update(visible=False), gr.update(visible=True)
         
-        prompt = get_prompt_for_simulation(history, system_b, chat_a, swap=True)
+        history_a.append((chat_b, chat_a))
 
+        prompt = get_prompt_for_simulation(history_b, system_b, chat_a)
         chat_b = ""
         for text in generate(prompt):
             if stop_generate:
                 break
 
             chat_b += text
-            yield history + [(chat_a, chat_b)], gr.update(visible=True), gr.update(visible=False)
+            yield history_b + [(chat_a, chat_b)], gr.update(visible=True), gr.update(visible=False)
 
-        history.append((chat_a, chat_b))
+        
+        history_b.append((chat_a, chat_b))
 
-    yield history, gr.update(visible=True), gr.update(visible=False)
+    yield history_b, gr.update(visible=True), gr.update(visible=False)
 
 def undo_history(history):
     return history[:-1]
