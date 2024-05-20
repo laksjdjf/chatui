@@ -54,13 +54,24 @@ def generate(prompt):
     ):
         yield chunk["choices"][0]["text"]
 
+def find_first_difference_index(list1, list2):
+    min_length = min(len(list1), len(list2))
+    
+    for i in range(min_length):
+        if list1[i] != list2[i]:
+            return i
+    
+    return min_length
+
 def eval_output(input, outputs):
     global model, config
     input_tokens = model.tokenize(input.encode("utf-8"), special=True)
 
-    if model._input_ids.tolist() != input_tokens: # reset and eval if input has changed
-        model.reset()
-        model.eval(input_tokens)
+    first_diff_index = find_first_difference_index(model._input_ids.tolist(), input_tokens)
+    
+    if first_diff_index < len(input_tokens):
+        model.n_tokens = first_diff_index
+        model.eval(input_tokens[first_diff_index:])
 
     log_likelihoods = []
     likelihoods = []

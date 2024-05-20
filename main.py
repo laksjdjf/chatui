@@ -5,6 +5,7 @@ from tabs.chat import chat
 from tabs.simulate import simulate
 from tabs.likelihood import likelihood
 from tabs.typo_checker import typo_checker
+from tabs.arena import arena
 
 if __name__ == "__main__":
     import argparse
@@ -22,6 +23,7 @@ if __name__ == "__main__":
     simulate_interface = simulate()
     likelihood_interface = likelihood()
     typo_checker_interface = typo_checker()
+    arena_interface = arena()
 
     demo = gr.TabbedInterface(
         [
@@ -30,7 +32,8 @@ if __name__ == "__main__":
             simulate_interface, 
             likelihood_interface, 
             typo_checker_interface, 
-            setting_interface
+            arena_interface,
+            setting_interface,
         ], 
         [
             "Chat", 
@@ -38,6 +41,7 @@ if __name__ == "__main__":
             "Simulate", 
             "Likelihood",
             "Typo Checker",
+            "Arena",
             "Setting"
         ],
         theme=gr.themes.Base()
