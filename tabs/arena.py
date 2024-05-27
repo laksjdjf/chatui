@@ -40,7 +40,6 @@ def arena_handler(prompt_template, player, file_name):
     
     ratings = [1500] * num_players
     wins = [0] * num_players
-    draws = [0] * num_players
     losses = [0] * num_players
     num_games = [0] * num_players
     avg_prob = [0] * num_players
@@ -54,18 +53,14 @@ def arena_handler(prompt_template, player, file_name):
         prompt_2 = prompt_template.format(player1=players[j], player2=players[i])
         likelihoods_2, log_likelihoods_2, _ = eval_output(prompt_2, outputs)
 
-        result_1 = likelihoods_1[0] > likelihoods_1[1]
-        result_2 = likelihoods_2[0] < likelihoods_2[1]
+        result = log_likelihoods_1[0] + log_likelihoods_2[1] > log_likelihoods_1[1] + log_likelihoods_2[0]
 
-        result = 0.5 if result_1 != result_2 else result_1
         prob_i = (likelihoods_1[0] + likelihoods_2[1]) / 2
         prob_j = (likelihoods_1[1] + likelihoods_2[0]) / 2
 
         ratings[i], ratings[j] = calculate_elo(ratings[i], ratings[j], result, k_factor=32)
         wins[i] += int(result)
         wins[j] += int(1 - result)
-        draws[i] += 1 if result == 0.5 else 0
-        draws[j] += 1 if result == 0.5 else 0
         losses[i] += int(1 - result)
         losses[j] += int(result)
         num_games[i] += 1
@@ -83,7 +78,6 @@ def arena_handler(prompt_template, player, file_name):
                 "Rating": ratings,
                 "Win": wins,
                 "Loss": losses,
-                "Draw": draws,
                 "Avg Prob": avg_prob,
             }
         ).sort_values("Rating", ascending=False)
@@ -128,7 +122,7 @@ def arena():
                 progress = gr.Textbox(label="Progress", value="0/0")
                 label = gr.Label("Result", num_top_classes=30)
                 df = gr.Dataframe(
-                    headers=["Player", "Rating", "Win", "Loss", "Draw", "Avg Prob"],
+                    headers=["Player", "Rating", "Win", "Loss", "Avg Prob"],
                     datatype=["str", "number", "number", "number", "number", "number"],
                     interactive=False,
                 )

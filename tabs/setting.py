@@ -139,7 +139,7 @@ def get_prompt(user, post_prompt = None):
     prompt += config.chatbot_template.split("{chatbot}")[0]
     return prompt
 
-def get_prompt_from_history(history, user=None, chatbot_beginning=None):
+def get_prompt_from_history(history, user=None, chatbot_beginning=None, generate_input=False):
     prompt = config.system_template.format(system=config.system)
     for i, (us, cb) in enumerate(history):
         prompt += config.user_template.format(user=us)
@@ -148,9 +148,12 @@ def get_prompt_from_history(history, user=None, chatbot_beginning=None):
         else:
             prompt += config.chatbot_template.format(chatbot=cb)
 
-    if user:
+    if user and not generate_input:
         prompt += config.user_template.format(user=user)
         prompt += config.chatbot_template.split("{chatbot}")[0] + chatbot_beginning
+
+    if generate_input:
+        prompt += config.user_template.split("{user}")[0] + user
 
     return prompt
 
@@ -173,13 +176,14 @@ def setting(model_dir):
             ctx = gr.Slider(label="n_ctx", minimum=256, maximum=65536, step=256, value = 4096)
             ts = gr.Textbox(label="tensor_split")
             n_batch = gr.Slider(label="n_batch", minimum=32, maximum=4096, step=32, value=512)
+            flash_attn = gr.Checkbox(label="flash_attn", value=False)
             output = gr.Textbox(label="output", value="")
 
             with gr.Row():
                 load_button = gr.Button(value="Load", variant="primary")
                 clear_button = gr.Button(value="Clear", variant="secondary")
 
-        def load_model(model_name, ngl, ctx, ts, n_batch):
+        def load_model(model_name, ngl, ctx, ts, n_batch, flash_attn):
             global model
             model_path = os.path.join(model_dir, model_name)
             ts = [float(x) for x in ts.split(",")] if ts else None
@@ -189,6 +193,7 @@ def setting(model_dir):
                 n_batch=n_batch,
                 tensor_split=ts,
                 n_ctx=ctx,
+                flash_attn=flash_attn,
                 logits_all = True,
             )
 
@@ -196,7 +201,7 @@ def setting(model_dir):
 
         load_button.click(
             load_model,
-            inputs=[model_name, ngl, ctx, ts, n_batch],
+            inputs=[model_name, ngl, ctx, ts, n_batch, flash_attn],
             outputs=[output],
         )
 
