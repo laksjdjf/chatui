@@ -6,6 +6,7 @@ from tabs.simulate import simulate
 from tabs.likelihood import likelihood
 from tabs.typo_checker import typo_checker
 from tabs.arena import arena
+from tabs.rag import rag
 
 if __name__ == "__main__":
     import argparse
@@ -24,6 +25,7 @@ if __name__ == "__main__":
     likelihood_interface = likelihood()
     typo_checker_interface = typo_checker()
     arena_interface = arena()
+    rag_interface = rag()
 
     demo = gr.TabbedInterface(
         [
@@ -33,6 +35,7 @@ if __name__ == "__main__":
             likelihood_interface, 
             typo_checker_interface, 
             arena_interface,
+            rag_interface,
             setting_interface,
         ], 
         [
@@ -42,6 +45,7 @@ if __name__ == "__main__":
             "Likelihood",
             "Typo Checker",
             "Arena",
+            "RAG",
             "Setting"
         ],
         theme=gr.themes.Base()
