@@ -1,5 +1,6 @@
 import gradio as gr
 from tabs.setting import generate, get_prompt_from_history
+from tabs.utils import view
 
 stop_generate = False
 
@@ -44,16 +45,6 @@ def generate_input_handler(history, user):
 def undo_history(history):
     pre_message = history[-1][0] if history else ""
     return pre_message, history[:-1]
-
-def view(history):
-    text = ""
-    for user, chatbot in history:
-        user_no_newline = user.replace("\n", "")
-        chatbot_no_newline = chatbot.replace("\n", "")
-
-        text += f'<div style="color: navy">user:{user_no_newline}</div>\n\n<div style="color: maroon">chatbot:{chatbot_no_newline}</div>'
-
-    return text
 
 def chat(user_avatar=None, chatbot_avatar=None):
     with gr.Blocks() as chat_interface:

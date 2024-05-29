@@ -1,5 +1,6 @@
 import gradio as gr
-from tabs.setting import generate, get_prompt_for_simulation
+from tabs.setting import generate, get_prompt_from_history
+from tabs.utils import view
 
 stop_generate = False
 
@@ -20,7 +21,7 @@ def chat_handler(history_b, system_a, system_b, first_message, n_completion):
 
     for i in range(n_completion):
         chat_a = ""
-        prompt = get_prompt_for_simulation(history_a, system_a, chat_b)
+        prompt = get_prompt_from_history(history_a, chat_b, system=system_a)
         
         if stop_generate:
             break
@@ -34,7 +35,7 @@ def chat_handler(history_b, system_a, system_b, first_message, n_completion):
         
         history_a.append((chat_b, chat_a))
 
-        prompt = get_prompt_for_simulation(history_b, system_b, chat_a)
+        prompt = get_prompt_from_history(history_b, chat_a, system=system_b)
         chat_b = ""
         for text in generate(prompt):
             if stop_generate:
@@ -51,15 +52,6 @@ def chat_handler(history_b, system_a, system_b, first_message, n_completion):
 def undo_history(history):
     return history[:-1]
 
-def view(history, name_a, name_b):
-    text = ""
-    for user, chatbot in history:
-        user_no_newline = user.replace("\n", "")
-        chatbot_no_newline = chatbot.replace("\n", "")
-
-        text += f'<div style="color: navy">{name_a}:{user_no_newline}</div>\n\n<div style="color: maroon">{name_b}:{chatbot_no_newline}</div>'
-
-    return text
 def swap(name_a, name_b, system_a, system_b):
     return name_b, name_a, system_b, system_a
 

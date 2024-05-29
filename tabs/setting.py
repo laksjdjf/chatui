@@ -4,6 +4,7 @@ import os
 from dataclasses import dataclass
 import torch
 import numpy as np
+from tabs.templates import get_template, template_list
 
 model = None
 
@@ -17,6 +18,7 @@ class ChatConfig:
     system_template: str = "<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>{system}<|END_OF_TURN_TOKEN|>"
     user_template: str = "<|START_OF_TURN_TOKEN|><|USER_TOKEN|>{user}<|END_OF_TURN_TOKEN|>"
     chatbot_template: str = "<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>{chatbot}<|END_OF_TURN_TOKEN|>"
+    debug: bool = False
 
     def __call__(
         self,
@@ -28,6 +30,7 @@ class ChatConfig:
         system_template: str,
         user_template: str,
         chatbot_template: str,
+        debug: bool,
     ):
         self.system = system
         self.temperature = temperature
@@ -37,13 +40,41 @@ class ChatConfig:
         self.system_template = system_template
         self.user_template = user_template
         self.chatbot_template = chatbot_template 
+        self.debug = debug
 
         return self.__repr__()
+    
+    @property
+    def system_prefix(self):
+        return self.system_template.split("{system}")[0]
+    
+    @property
+    def system_suffix(self):
+        return self.system_template.split("{system}")[1]
+    
+    @property
+    def user_prefix(self):
+        return self.user_template.split("{user}")[0]
+    
+    @property
+    def user_suffix(self):
+        return self.user_template.split("{user}")[1]
+    
+    @property
+    def chatbot_prefix(self):
+        return self.chatbot_template.split("{chatbot}")[0]
+    
+    @property
+    def chatbot_suffix(self):
+        return self.chatbot_template.split("{chatbot}")[1]
 
 config = ChatConfig()
 
-def generate(prompt):
+def generate(prompt:str):
     global model, config
+    if config.debug:
+        print(f"Prompt: {prompt}")
+
     for chunk in model(
         prompt,
         max_tokens=config.max_tokens,
@@ -56,37 +87,38 @@ def generate(prompt):
 
 def find_first_difference_index(list1, list2):
     min_length = min(len(list1), len(list2))
-    
+
     for i in range(min_length):
         if list1[i] != list2[i]:
             return i
     
     return min_length
 
-def eval_output(input, outputs):
+def eval_output(input: str, outputs: list):
     global model, config
-    input_tokens = model.tokenize(input.encode("utf-8"), special=True)
+    input_tokens = model.tokenize(input.encode("utf-8"), special=True) # bos含む
 
+    # 入力トークンが変更された位置を計算
     first_diff_index = find_first_difference_index(model._input_ids.tolist(), input_tokens)
     
     if first_diff_index < len(input_tokens):
-        model.n_tokens = first_diff_index
-        model.eval(input_tokens[first_diff_index:])
+        model.n_tokens = first_diff_index # 変更されていないトークンまでは維持
+        model.eval(input_tokens[first_diff_index:]) # 変更されたトークンを評価
 
-    log_likelihoods = []
-    likelihoods = []
-    num_tokens = []
+    log_likelihoods, likelihoods, num_tokens = [], [], []
 
     for output in outputs:
         output_tokens = model.tokenize(output.encode("utf-8"), add_bos=False, special=True)
         model.eval(output_tokens)
         
-        logprobs = Llama.logits_to_logprobs(model.eval_logits)
-        model.reset()
+        logprobs = Llama.logits_to_logprobs(model.eval_logits) # 対数確率
 
-        # inputの最後から、outputの最後から二番目まで
+        # inputの最後（outputの最初の予測）からoutputの最後から二番目（outputの最後の予測）までの対数確率を取得
         logprobs_target = logprobs[range(len(input_tokens)-1, len(input_tokens) + len(output_tokens) - 1), torch.tensor(output_tokens)]
         
+        if config.debug:
+            print(logprobs_target.shape)
+
         log_likelihood = logprobs_target.sum()
         likelihood = np.exp(log_likelihood)
 
@@ -96,31 +128,39 @@ def eval_output(input, outputs):
 
         model.n_tokens = len(input_tokens) # inputまで評価した状態に戻す。
 
-        print(f"{output}:\n  Likelihood: {likelihood:.3f}\n  Log Likelihood: {log_likelihood:.3f}\n num_tokens: {len(output_tokens)})")
-
     return likelihoods, log_likelihoods, num_tokens
 
-def eval_text(text, threshold):
+def eval_text(text:str, threshold:float):
     global model, config
     tokens = model.tokenize(text.encode("utf-8"), special=True)
 
-    if model._input_ids.tolist() != tokens: # reset and eval if input has changed
-        model.reset()
-        model.eval(tokens)
+    # 入力トークンが変更された位置を計算
+    first_diff_index = find_first_difference_index(model._input_ids.tolist(), tokens)
+    
+    if first_diff_index < len(tokens):
+        model.n_tokens = first_diff_index # 変更されていないトークンまでは維持
+        model.eval(tokens[first_diff_index:]) # 変更されたトークンを評価
     
     logprobs = Llama.logits_to_logprobs(model.eval_logits)
-
-    print(logprobs.shape)
+    
+    # 各トークンの対数確率
     logprobs_target = logprobs[range(0, len(tokens) - 1), torch.tensor(tokens[1:])]
+    
+    if config.debug:
+        print(logprobs_target.shape)
+
     logprobs_max = logprobs.max(axis=1)[:1]
 
+    # 確率が最大値に比べて閾値以下のトークンをtypoとして返す
+    # exp(logprobs_target) < exp(logprobs_max) * thresholdの対数をとっています。
     typo = logprobs_target < (logprobs_max + np.log(threshold))
     typo = typo.tolist()
     
     log_likelihood = logprobs_target.sum()
-    perplexity = np.exp(-log_likelihood / (len(tokens) - 1))
+    perplexity = np.exp(-log_likelihood / (len(tokens) - 1)) # 確率の逆数の相乗平均
     
     text_splited = []
+    # detokenize
     for x in tokens[1:]:
         try:
             text_splited.append(model.detokenize([x]).decode("utf-8"))
@@ -130,45 +170,67 @@ def eval_text(text, threshold):
     return perplexity, typo, text_splited
 
 def get_prompt(user, post_prompt = None):
+    '''
+    system + user + chatbot_prefix
+    or
+    post_prompt + user + chatbot_prefix
+    '''
     if post_prompt:
         prompt = post_prompt
     else:
         prompt = config.system_template.format(system=config.system)
 
     prompt += config.user_template.format(user=user)
-    prompt += config.chatbot_template.split("{chatbot}")[0]
+    prompt += config.chatbot_prefix
     return prompt
 
-def get_prompt_from_history(history, user=None, chatbot_beginning=None, generate_input=False):
-    prompt = config.system_template.format(system=config.system)
+def get_prompt_from_history(history, user=None, chatbot_beginning="", generate_input=False, system=None):
+    global config
+    '''
+    if user is not None and not generate_input:
+        system + user_1 + chatbot_1 + ... + user_n + chatbot_n + user + chatbot_prefix + chatbot_beginning
+    elif user is None and not generate input: （chatbotに続きを書かせる）
+        system + user_1 + chatbot_1 + ... + user_n + chatbot_prefix + chatbot_n
+    elif generate_input:
+        system + user_1 + chatbot_1 + ... + user_n + chatbot_n + user_prefix + user
+        
+    '''
+    prompt = config.system_template.format(system=system if system else config.system)
     for i, (us, cb) in enumerate(history):
         prompt += config.user_template.format(user=us)
         if user is None and (i == len(history) - 1):
-            prompt += config.chatbot_template.split("{chatbot}")[0] + cb
+            prompt += config.chatbot_prefix + cb
         else:
             prompt += config.chatbot_template.format(chatbot=cb)
 
     if user and not generate_input:
         prompt += config.user_template.format(user=user)
-        prompt += config.chatbot_template.split("{chatbot}")[0] + chatbot_beginning
+        prompt += config.chatbot_prefix + chatbot_beginning
 
     if generate_input:
-        prompt += config.user_template.split("{user}")[0] + user
+        prompt += config.user_prefix + user
 
-    return prompt
-
-def get_prompt_for_simulation(history, system, user):
-    prompt = config.system_template.format(system=system)
-    for i, (us, cb) in enumerate(history):
-        prompt += config.user_template.format(user=us)
-        prompt += config.chatbot_template.format(chatbot=cb)
-
-    prompt += config.user_template.format(user=user)
-    prompt += config.chatbot_template.split("{chatbot}")[0]
     return prompt
 
 def setting(model_dir):
     global model, config
+
+    def load_model(model_name, ngl, ctx, ts, n_batch, flash_attn):
+        global model
+        model_path = os.path.join(model_dir, model_name)
+        ts = [float(x) for x in ts.split(",")] if ts else None
+        model = Llama(
+            model_path=model_path,
+            n_gpu_layers=ngl,
+            n_batch=n_batch,
+            tensor_split=ts,
+            n_ctx=ctx,
+            flash_attn=flash_attn,
+            logits_all = True,
+        )
+
+        return "Model loaded successfully."
+        
     with gr.Blocks() as setting_interfate:
         with gr.Accordion("モデルのロード"):
             model_name = gr.Dropdown([model for model in os.listdir(model_dir)], label="model_name")
@@ -182,22 +244,6 @@ def setting(model_dir):
             with gr.Row():
                 load_button = gr.Button(value="Load", variant="primary")
                 clear_button = gr.Button(value="Clear", variant="secondary")
-
-        def load_model(model_name, ngl, ctx, ts, n_batch, flash_attn):
-            global model
-            model_path = os.path.join(model_dir, model_name)
-            ts = [float(x) for x in ts.split(",")] if ts else None
-            model = Llama(
-                model_path=model_path,
-                n_gpu_layers=ngl,
-                n_batch=n_batch,
-                tensor_split=ts,
-                n_ctx=ctx,
-                flash_attn=flash_attn,
-                logits_all = True,
-            )
-
-            return "Model loaded successfully."
 
         load_button.click(
             load_model,
@@ -226,13 +272,16 @@ def setting(model_dir):
             system_template = gr.Textbox(label="system_template", value="<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>{system}<|END_OF_TURN_TOKEN|>", lines=3)
             user_template = gr.Textbox(label="user_template", value="<|START_OF_TURN_TOKEN|><|USER_TOKEN|>{user}<|END_OF_TURN_TOKEN|>", lines=3)
             chatbot_template = gr.Textbox(label="chatbot_template", value="<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>{chatbot}<|END_OF_TURN_TOKEN|>", lines=3)
+            debug = gr.Checkbox(label="debug", value=False)
 
             output = gr.Textbox(label="output", interactive=False)
+            setting_list = [system, temperature, top_p, max_tokens, repeat_penalty, system_template, user_template, chatbot_template, debug]
 
-            setting_list = [system, temperature, top_p, max_tokens, repeat_penalty, system_template, user_template, chatbot_template]
+            template_dropdown = gr.Dropdown(template_list, label="template_list")
 
         for setting in setting_list:
-            setting.change(config, inputs=setting_list, outputs=output)    
+            setting.change(config, inputs=setting_list, outputs=output)
+        template_dropdown.change(get_template, inputs=template_dropdown, outputs=[system_template, user_template, chatbot_template])    
         
     return setting_interfate
 
