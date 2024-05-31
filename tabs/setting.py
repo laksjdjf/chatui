@@ -1,4 +1,5 @@
 from llama_cpp import Llama
+from llama_cpp.llama_grammar import LlamaGrammar, JSON_GBNF, LIST_GBNF
 import gradio as gr
 import os
 from dataclasses import dataclass
@@ -7,6 +8,16 @@ import numpy as np
 from tabs.templates import get_template, template_list
 
 model = None
+
+# https://github.com/ggerganov/llama.cpp/blob/master/grammars/japanese.gbnf
+JAPANESE_SIMPLE_GBNF = r"""
+root        ::= jp-char+ ([ \t\n] jp-char+)*
+jp-char     ::= hiragana | katakana | punctuation | cjk
+hiragana    ::= [ぁ-ゟ]
+katakana    ::= [ァ-ヿ]
+punctuation ::= [、-〾]
+cjk         ::= [一-鿿]
+"""
 
 @dataclass
 class ChatConfig:
@@ -18,6 +29,7 @@ class ChatConfig:
     system_template: str = "<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>{system}<|END_OF_TURN_TOKEN|>"
     user_template: str = "<|START_OF_TURN_TOKEN|><|USER_TOKEN|>{user}<|END_OF_TURN_TOKEN|>"
     chatbot_template: str = "<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>{chatbot}<|END_OF_TURN_TOKEN|>"
+    grammar: str = ""
     debug: bool = False
 
     def __call__(
@@ -30,6 +42,7 @@ class ChatConfig:
         system_template: str,
         user_template: str,
         chatbot_template: str,
+        grammar: str,
         debug: bool,
     ):
         self.system = system
@@ -39,7 +52,8 @@ class ChatConfig:
         self.repeat_penalty = repeat_penalty
         self.system_template = system_template
         self.user_template = user_template
-        self.chatbot_template = chatbot_template 
+        self.chatbot_template = chatbot_template
+        self.grammar = grammar
         self.debug = debug
 
         return self.__repr__()
@@ -75,12 +89,18 @@ def generate(prompt:str):
     if config.debug:
         print(f"Prompt: {prompt}")
 
+    if config.grammar:
+        grammar = LlamaGrammar.from_string(config.grammar)
+    else:
+        grammar = None
+
     for chunk in model(
         prompt,
         max_tokens=config.max_tokens,
         temperature=config.temperature,
         top_p=config.top_p,
         repeat_penalty=config.repeat_penalty,
+        grammar=grammar,
         stream=True,
     ):
         yield chunk["choices"][0]["text"]
@@ -212,6 +232,16 @@ def get_prompt_from_history(history, user=None, chatbot_beginning="", generate_i
 
     return prompt
 
+def get_gradio_output(template):
+    if template == "japanese":
+        return JAPANESE_SIMPLE_GBNF
+    elif template == "list":
+        return LIST_GBNF
+    elif template == "json":
+        return JSON_GBNF
+    else:
+        return ""
+
 def setting(model_dir):
     global model, config
 
@@ -272,17 +302,20 @@ def setting(model_dir):
             system_template = gr.Textbox(label="system_template", value="<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>{system}<|END_OF_TURN_TOKEN|>", lines=3)
             user_template = gr.Textbox(label="user_template", value="<|START_OF_TURN_TOKEN|><|USER_TOKEN|>{user}<|END_OF_TURN_TOKEN|>", lines=3)
             chatbot_template = gr.Textbox(label="chatbot_template", value="<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>{chatbot}<|END_OF_TURN_TOKEN|>", lines=3)
+            grammar = gr.Textbox(label="grammar", value="", lines=3)
             debug = gr.Checkbox(label="debug", value=False)
 
             output = gr.Textbox(label="output", interactive=False)
-            setting_list = [system, temperature, top_p, max_tokens, repeat_penalty, system_template, user_template, chatbot_template, debug]
+            setting_list = [system, temperature, top_p, max_tokens, repeat_penalty, system_template, user_template, chatbot_template, grammar, debug]
 
             template_dropdown = gr.Dropdown(template_list, label="template_list")
+            grammar_dropdown = gr.Dropdown(["list", "json", "japanese"], label="grammar_list")
 
         for setting in setting_list:
             setting.change(config, inputs=setting_list, outputs=output)
         template_dropdown.change(get_template, inputs=template_dropdown, outputs=[system_template, user_template, chatbot_template])    
-        
+        grammar_dropdown.change(get_gradio_output, inputs=grammar_dropdown, outputs=[grammar])
+
     return setting_interfate
 
 if __name__ == "__main__":
