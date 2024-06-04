@@ -22,7 +22,14 @@ llama2 = (
     "{chatbot}",
 )
 
-template_list = ["cohere", "phi3", "swallow", "llama2"]
+llama3 = (
+    "<|start_header_id|>system<|end_header_id|>\n\n{system}<|eot_id|>",
+    "<|start_header_id|>user<|end_header_id|>\n\n{user}<|eot_id|>",
+    "<|start_header_id|>chatbot<|end_header_id|>\n\n{chatbot}<|eot_id|>",
+
+)
+
+template_list = ["cohere", "phi3", "swallow", "llama2", "llama3"]
 
 def get_template(template):
     if template == "cohere":
@@ -33,5 +40,6 @@ def get_template(template):
         return swallow
     elif template == "llama2":
         return llama2
-    
+    elif template == "llama3":
+        return llama3
     return 

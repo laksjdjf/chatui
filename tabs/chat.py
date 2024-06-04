@@ -1,6 +1,5 @@
 import gradio as gr
-from tabs.setting import generate, get_prompt_from_history
-from tabs.utils import view
+from tabs.setting import generate, get_prompt_from_history, view
 
 stop_generate = False
 

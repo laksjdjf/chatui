@@ -1,6 +1,5 @@
 import gradio as gr
-from tabs.setting import generate, get_prompt_from_history
-from tabs.utils import view
+from tabs.setting import generate, get_prompt_from_history, view
 
 stop_generate = False
 
@@ -89,6 +88,6 @@ def simulate(user_avatar=None, chatbot_avatar=None):
         swap_button.click(swap, inputs=[name_a, name_b, system_a, system_b], outputs=[name_a, name_b, system_a, system_b])
         undo_button_chat.click(undo_history, inputs=[chatbot], outputs=[chatbot])
 
-        view_button.click(view, inputs=[chatbot, name_a, name_b], outputs=[view_text])
+        view_button.click(view, inputs=[chatbot, name_a, name_b, system_a, system_b], outputs=[view_text])
 
     return simulate_interface

@@ -1,4 +1,6 @@
 from llama_cpp import Llama
+from llama_cpp.llama_grammar import LlamaGrammar, JSON_GBNF, LIST_GBNF
+from llama_cpp.llama_cpp import GGML_TYPE_Q4_0, GGML_TYPE_Q8_0, GGML_TYPE_F16
 import gradio as gr
 import os
 from dataclasses import dataclass
@@ -7,6 +9,23 @@ import numpy as np
 from tabs.templates import get_template, template_list
 
 model = None
+
+# https://github.com/ggerganov/llama.cpp/blob/master/grammars/japanese.gbnf
+JAPANESE_SIMPLE_GBNF = r"""
+root        ::= (jp-char | space)+
+jp-char     ::= hiragana | katakana | punctuation | cjk
+hiragana    ::= [ぁ-ゟ]
+katakana    ::= [ァ-ヿ]
+punctuation ::= [、-〽]
+cjk         ::= [一-龯]
+space       ::= [ \t\n]
+"""
+
+GGML_TYPE = {
+    "q4_0": GGML_TYPE_Q4_0,
+    "q8_0": GGML_TYPE_Q8_0,
+    "f16": GGML_TYPE_F16
+}
 
 @dataclass
 class ChatConfig:
@@ -18,6 +37,7 @@ class ChatConfig:
     system_template: str = "<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>{system}<|END_OF_TURN_TOKEN|>"
     user_template: str = "<|START_OF_TURN_TOKEN|><|USER_TOKEN|>{user}<|END_OF_TURN_TOKEN|>"
     chatbot_template: str = "<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>{chatbot}<|END_OF_TURN_TOKEN|>"
+    grammar: str = ""
     debug: bool = False
 
     def __call__(
@@ -30,6 +50,7 @@ class ChatConfig:
         system_template: str,
         user_template: str,
         chatbot_template: str,
+        grammar: str,
         debug: bool,
     ):
         self.system = system
@@ -39,7 +60,8 @@ class ChatConfig:
         self.repeat_penalty = repeat_penalty
         self.system_template = system_template
         self.user_template = user_template
-        self.chatbot_template = chatbot_template 
+        self.chatbot_template = chatbot_template
+        self.grammar = grammar
         self.debug = debug
 
         return self.__repr__()
@@ -75,12 +97,18 @@ def generate(prompt:str):
     if config.debug:
         print(f"Prompt: {prompt}")
 
+    if config.grammar:
+        grammar = LlamaGrammar.from_string(config.grammar)
+    else:
+        grammar = None
+
     for chunk in model(
         prompt,
         max_tokens=config.max_tokens,
         temperature=config.temperature,
         top_p=config.top_p,
         repeat_penalty=config.repeat_penalty,
+        grammar=grammar,
         stream=True,
     ):
         yield chunk["choices"][0]["text"]
@@ -212,10 +240,39 @@ def get_prompt_from_history(history, user=None, chatbot_beginning="", generate_i
 
     return prompt
 
+def get_gradio_output(template):
+    if template == "japanese":
+        return JAPANESE_SIMPLE_GBNF
+    elif template == "list":
+        return LIST_GBNF
+    elif template == "json":
+        return JSON_GBNF
+    else:
+        return ""
+
+def view(history, name_a="user", name_b="chatbot", system_a=None, system_b=None):
+    if system_a and system_b:
+        text = f"{name_a}: {system_a}\n{name_b}: {system_b}\n\n"
+    else:
+        text = f"system: {config.system}\n\n"
+        
+    for user, chatbot in history:
+        
+        # 改行でspanが効かなくなっちゃうので、改行ごとにspanを挟む
+        user_split_line = [name_a + ":"] + user.split("\n")
+        user = "\n".join([f'<span style="color: navy">{line}</span>' for line in user_split_line])
+
+        chatbot_split_line = [name_b + ":"] + chatbot.split("\n")
+        chatbot = "\n".join([f'<span style="color: maroon">{line}</span>' for line in chatbot_split_line])
+
+        text += f'{user}\n\n{chatbot}\n\n'
+
+    return text
+
 def setting(model_dir):
     global model, config
 
-    def load_model(model_name, ngl, ctx, ts, n_batch, flash_attn):
+    def load_model(model_name, ngl, ctx, ts, n_batch, flash_attn, type_k, logits_all):
         global model
         model_path = os.path.join(model_dir, model_name)
         ts = [float(x) for x in ts.split(",")] if ts else None
@@ -226,7 +283,8 @@ def setting(model_dir):
             tensor_split=ts,
             n_ctx=ctx,
             flash_attn=flash_attn,
-            logits_all = True,
+            type_k=GGML_TYPE[type_k],
+            logits_all = logits_all
         )
 
         return "Model loaded successfully."
@@ -239,6 +297,8 @@ def setting(model_dir):
             ts = gr.Textbox(label="tensor_split")
             n_batch = gr.Slider(label="n_batch", minimum=32, maximum=4096, step=32, value=512)
             flash_attn = gr.Checkbox(label="flash_attn", value=False)
+            type_k = gr.Dropdown(["q4_0", "q8_0", "f16"], value="f16", label="type_k")
+            logits_all = gr.Checkbox(label="logits_all", value=True)
             output = gr.Textbox(label="output", value="")
 
             with gr.Row():
@@ -247,7 +307,7 @@ def setting(model_dir):
 
         load_button.click(
             load_model,
-            inputs=[model_name, ngl, ctx, ts, n_batch, flash_attn],
+            inputs=[model_name, ngl, ctx, ts, n_batch, flash_attn, type_k, logits_all],
             outputs=[output],
         )
 
@@ -272,17 +332,20 @@ def setting(model_dir):
             system_template = gr.Textbox(label="system_template", value="<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>{system}<|END_OF_TURN_TOKEN|>", lines=3)
             user_template = gr.Textbox(label="user_template", value="<|START_OF_TURN_TOKEN|><|USER_TOKEN|>{user}<|END_OF_TURN_TOKEN|>", lines=3)
             chatbot_template = gr.Textbox(label="chatbot_template", value="<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>{chatbot}<|END_OF_TURN_TOKEN|>", lines=3)
+            grammar = gr.Textbox(label="grammar", value="", lines=3)
             debug = gr.Checkbox(label="debug", value=False)
 
             output = gr.Textbox(label="output", interactive=False)
-            setting_list = [system, temperature, top_p, max_tokens, repeat_penalty, system_template, user_template, chatbot_template, debug]
+            setting_list = [system, temperature, top_p, max_tokens, repeat_penalty, system_template, user_template, chatbot_template, grammar, debug]
 
             template_dropdown = gr.Dropdown(template_list, label="template_list")
+            grammar_dropdown = gr.Dropdown(["list", "json", "japanese"], label="grammar_list")
 
         for setting in setting_list:
             setting.change(config, inputs=setting_list, outputs=output)
         template_dropdown.change(get_template, inputs=template_dropdown, outputs=[system_template, user_template, chatbot_template])    
-        
+        grammar_dropdown.change(get_gradio_output, inputs=grammar_dropdown, outputs=[grammar])
+
     return setting_interfate
 
 if __name__ == "__main__":
