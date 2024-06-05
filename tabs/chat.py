@@ -18,14 +18,18 @@ def chat_handler(history, user=None, chatbot_beginning=None):
     else:
         chatbot = chatbot_beginning
 
+    
+    # input, chatbot, generate_button, stop_button
+    yield gr.update(value=""), history + [(user, chatbot)], gr.update(visible=False), gr.update(visible=True)
+
     for text in generate(prompt):
         if stop_generate:
             break
 
         chatbot += text
-        yield "", history + [(user, chatbot)], gr.update(visible=False), gr.update(visible=True)
+        yield gr.update(interactive=True), history + [(user, chatbot)], gr.update(visible=False), gr.update(visible=True)
 
-    yield "", history + [(user, chatbot)], gr.update(visible=True), gr.update(visible=False)
+    yield gr.update(interactive=True), history + [(user, chatbot)], gr.update(visible=True), gr.update(visible=False)
 
 def generate_input_handler(history, user):
     global stop_generate

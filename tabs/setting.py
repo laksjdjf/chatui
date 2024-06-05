@@ -1,4 +1,4 @@
-from llama_cpp import Llama
+from llama_cpp import Llama, LogitsProcessor
 from llama_cpp.llama_grammar import LlamaGrammar, JSON_GBNF, LIST_GBNF
 from llama_cpp.llama_cpp import GGML_TYPE_Q4_0, GGML_TYPE_Q8_0, GGML_TYPE_F16
 import gradio as gr
@@ -6,6 +6,7 @@ import os
 from dataclasses import dataclass
 import torch
 import numpy as np
+import re
 from tabs.templates import get_template, template_list
 
 model = None
@@ -92,8 +93,62 @@ class ChatConfig:
 
 config = ChatConfig()
 
+class BanLogitsProcessor(LogitsProcessor):
+    def __init__(self, ban_ids):
+        self.ban_ids = ban_ids
+
+    def __call__(self, input_ids, scores):
+        scores[self.ban_ids] = -np.inf
+        return scores
+
+logits_processor = None
+
+PATTERNS = {
+    'ひらがな': '[\u3040-\u309F]',
+    'カタカナ': '[\u30A0-\u30FF]',
+    '漢字': '[\u4E00-\u9FFF]',
+    'アルファベット': '[a-zA-Z]',
+    'ハングル': '[\uAC00-\uD7AF]',
+    'アラビア文字': '[\u0600-\u06FF]',
+    'キリル文字': '[\u0400-\u04FF]',
+    'ギリシャ文字': '[\u0370-\u03FF]',
+    'デーヴァナーガリー文字': '[\u0900-\u097F]',
+    'タイ文字': '[\u0E00-\u0E7F]',
+    'ヘブライ文字': '[\u0590-\u05FF]',
+    'エチオピア文字': '[\u1200-\u137F]'   
+}
+
+def contains_character_set(text, languages):
+    for language in languages:
+        compiled_pattern = re.compile(PATTERNS[language])
+        if bool(compiled_pattern.search(text)):
+            return True
+    return False
+
+def get_ban_token_ids(languages):
+    global model
+    ban_tokens = []
+    for i in range(model.n_vocab()):
+        try:
+            text = model.detokenize([i]).decode("utf-8")
+        except:
+            continue
+        if contains_character_set(text, languages):
+            ban_tokens.append(i)
+    return ban_tokens
+
+def set_logits_processor(languages):
+    global logits_processor
+    if languages:
+        ban_ids = get_ban_token_ids(languages)
+        logits_processor = BanLogitsProcessor(ban_ids)
+    else:
+        logits_processor = None
+    
+    return f"Number of ban tokens: {len(ban_ids)}"
+
 def generate(prompt:str):
-    global model, config
+    global model, config, logits_processor
     if config.debug:
         print(f"Prompt: {prompt}")
 
@@ -109,6 +164,7 @@ def generate(prompt:str):
         top_p=config.top_p,
         repeat_penalty=config.repeat_penalty,
         grammar=grammar,
+        logits_processor=logits_processor,
         stream=True,
     ):
         yield chunk["choices"][0]["text"]
@@ -122,8 +178,12 @@ def find_first_difference_index(list1, list2):
     
     return min_length
 
-def eval_output(input: str, outputs: list):
+def eval_output(input: str, outputs: list = []):
     global model, config
+    
+    if not model.context_params.logits_all:
+        raise ValueError("logits_all must be True.")
+    
     input_tokens = model.tokenize(input.encode("utf-8"), special=True) # bos含む
 
     # 入力トークンが変更された位置を計算
@@ -160,6 +220,10 @@ def eval_output(input: str, outputs: list):
 
 def eval_text(text:str, threshold:float):
     global model, config
+
+    if not model.context_params.logits_all:
+        raise ValueError("logits_all must be True.")
+
     tokens = model.tokenize(text.encode("utf-8"), special=True)
 
     # 入力トークンが変更された位置を計算
@@ -240,7 +304,7 @@ def get_prompt_from_history(history, user=None, chatbot_beginning="", generate_i
 
     return prompt
 
-def get_gradio_output(template):
+def get_gbnf(template):
     if template == "japanese":
         return JAPANESE_SIMPLE_GBNF
     elif template == "list":
@@ -272,7 +336,7 @@ def view(history, name_a="user", name_b="chatbot", system_a=None, system_b=None)
 def setting(model_dir):
     global model, config
 
-    def load_model(model_name, ngl, ctx, ts, n_batch, flash_attn, type_k, logits_all):
+    def load_model(model_name, ngl, ctx, ts, n_batch, flash_attn, no_kv_offload, type_kv, logits_all):
         global model
         model_path = os.path.join(model_dir, model_name)
         ts = [float(x) for x in ts.split(",")] if ts else None
@@ -283,8 +347,10 @@ def setting(model_dir):
             tensor_split=ts,
             n_ctx=ctx,
             flash_attn=flash_attn,
-            type_k=GGML_TYPE[type_k],
-            logits_all = logits_all
+            offload_kqv= not no_kv_offload,
+            type_k=GGML_TYPE[type_kv],
+            type_v=GGML_TYPE[type_kv],
+            logits_all=logits_all
         )
 
         return "Model loaded successfully."
@@ -293,11 +359,12 @@ def setting(model_dir):
         with gr.Accordion("モデルのロード"):
             model_name = gr.Dropdown([model for model in os.listdir(model_dir)], label="model_name")
             ngl = gr.Slider(label="n_gpu_layers", minimum=0, maximum=256, step=1, value=256)
-            ctx = gr.Slider(label="n_ctx", minimum=256, maximum=65536, step=256, value = 4096)
+            ctx = gr.Slider(label="n_ctx", minimum=256, maximum=256000, step=256, value = 4096)
             ts = gr.Textbox(label="tensor_split")
             n_batch = gr.Slider(label="n_batch", minimum=32, maximum=4096, step=32, value=512)
             flash_attn = gr.Checkbox(label="flash_attn", value=False)
-            type_k = gr.Dropdown(["q4_0", "q8_0", "f16"], value="f16", label="type_k")
+            no_kv_offload = gr.Checkbox(label="no_kv_offload", value=False)
+            type_kv = gr.Dropdown(["q4_0", "q8_0", "f16"], value="f16", label="type_kv")
             logits_all = gr.Checkbox(label="logits_all", value=True)
             output = gr.Textbox(label="output", value="")
 
@@ -307,7 +374,7 @@ def setting(model_dir):
 
         load_button.click(
             load_model,
-            inputs=[model_name, ngl, ctx, ts, n_batch, flash_attn, type_k, logits_all],
+            inputs=[model_name, ngl, ctx, ts, n_batch, flash_attn, no_kv_offload, type_kv, logits_all],
             outputs=[output],
         )
 
@@ -327,7 +394,7 @@ def setting(model_dir):
             system = gr.Textbox(label="system", value="あなたは優秀なアシスタントです。", lines=2)
             temperature = gr.Slider(minimum=0, maximum=2, step=0.01, value=0.8, label="temperature")
             top_p = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.9, label="top_p")
-            max_tokens = gr.Slider(minimum=1, maximum=65536, step=1, value=256, label="max_tokens")
+            max_tokens = gr.Slider(minimum=1, maximum=256000, step=1, value=256, label="max_tokens")
             repeat_penalty = gr.Slider(minimum=1.0, maximum=2.0, step=0.01, value=1.0, label="repeat_penalty")
             system_template = gr.Textbox(label="system_template", value="<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>{system}<|END_OF_TURN_TOKEN|>", lines=3)
             user_template = gr.Textbox(label="user_template", value="<|START_OF_TURN_TOKEN|><|USER_TOKEN|>{user}<|END_OF_TURN_TOKEN|>", lines=3)
@@ -344,7 +411,18 @@ def setting(model_dir):
         for setting in setting_list:
             setting.change(config, inputs=setting_list, outputs=output)
         template_dropdown.change(get_template, inputs=template_dropdown, outputs=[system_template, user_template, chatbot_template])    
-        grammar_dropdown.change(get_gradio_output, inputs=grammar_dropdown, outputs=[grammar])
+        grammar_dropdown.change(get_gbnf, inputs=grammar_dropdown, outputs=[grammar])
+
+        with gr.Accordion("Logits Processor"):
+            languages_checkbox = gr.CheckboxGroup(list(PATTERNS.keys()), label="check the languages you want to ban")
+            logits_processor_load_button = gr.Button("Load", variant="primary")
+            logits_processor_output = gr.Textbox(label="number of ban tokens", interactive=False)
+        
+        logits_processor_load_button.click(
+            set_logits_processor,
+            inputs=[languages_checkbox],
+            outputs=[logits_processor_output]
+        )
 
     return setting_interfate
 
