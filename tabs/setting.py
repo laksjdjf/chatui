@@ -141,11 +141,14 @@ def set_logits_processor(languages):
     global logits_processor
     if languages:
         ban_ids = get_ban_token_ids(languages)
-        logits_processor = BanLogitsProcessor(ban_ids)
-    else:
-        logits_processor = None
-    
-    return f"Number of ban tokens: {len(ban_ids)}"
+        if len(ban_ids) == 0:
+            logits_processor = None
+            return "No ban tokens found."
+        else:
+            logits_processor = BanLogitsProcessor(ban_ids)
+            return f"Number of ban tokens: {len(ban_ids)}"
+    logits_processor = None
+    return "No languages selected."
 
 def generate(prompt:str):
     global model, config, logits_processor
