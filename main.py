@@ -7,10 +7,14 @@ from tabs.likelihood import likelihood
 from tabs.typo_checker import typo_checker
 from tabs.arena import arena
 from tabs.rag import rag
+import os
 
 if __name__ == "__main__":
     import argparse
 
+    
+    os.makedirs("tmp", exist_ok=True)
+    
     parser = argparse.ArgumentParser()
     parser.add_argument("--share", action="store_true")
     parser.add_argument("--model_dir", "-m", help="path to model directory")
@@ -51,4 +55,4 @@ if __name__ == "__main__":
         theme=gr.themes.Base()
     )
 
-    demo.launch(share = args.share)
+    demo.launch(share = args.share, allowed_paths=["/"])

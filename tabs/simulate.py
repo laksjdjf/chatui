@@ -41,7 +41,7 @@ def chat_handler(history_b, system_a, system_b, first_message, n_completion):
                 break
 
             chat_b += text
-            yield history_b + [(chat_a, chat_b)], gr.update(visible=True), gr.update(visible=False)
+            yield history_b + [(chat_a, chat_b)], gr.update(visible=False), gr.update(visible=True)
 
         
         history_b.append((chat_a, chat_b))
@@ -51,8 +51,11 @@ def chat_handler(history_b, system_a, system_b, first_message, n_completion):
 def undo_history(history):
     return history[:-1]
 
-def swap(name_a, name_b, system_a, system_b):
-    return name_b, name_a, system_b, system_a
+def swap(name_a, name_b, system_a, system_b, icon_a, icon_b):
+    return name_b, name_a, system_b, system_a, icon_b, icon_a
+
+def apply_icon(user_icon, chatbot_icon):
+    return gr.update(avatar_images=[user_icon, chatbot_icon])
 
 def simulate(user_avatar=None, chatbot_avatar=None):
     with gr.Blocks() as simulate_interface:
@@ -63,10 +66,13 @@ def simulate(user_avatar=None, chatbot_avatar=None):
             with gr.Row():
                 with gr.Group():
                     name_a = gr.Textbox(label="Name A", placeholder="Enter your name here...", lines=1)
+                    icon_a = gr.Image(label="Icon A", type="filepath")
                     system_a = gr.Textbox(label="System A", placeholder="Enter your message here...", lines=3)
                 with gr.Group():
                     name_b = gr.Textbox(label="Name B", placeholder="Enter your name here...", lines=1)
+                    icon_b = gr.Image(label="Icon B", type="filepath")
                     system_b = gr.Textbox(label="System B", placeholder="Enter your message here...", lines=3)
+            icon_apply_button = gr.Button("Apply Icon", variant="primary")
             first_message = gr.Textbox(label="First message", placeholder="Enter your message here...", lines=2)
             swap_button = gr.Button("Swap")
 
@@ -85,9 +91,11 @@ def simulate(user_avatar=None, chatbot_avatar=None):
         generate_button.click(chat_handler, inputs=[chatbot, system_a, system_b, first_message, n_completion], outputs=[chatbot, generate_button, stop_button])
         stop_button.click(stop)
 
-        swap_button.click(swap, inputs=[name_a, name_b, system_a, system_b], outputs=[name_a, name_b, system_a, system_b])
+        swap_button.click(swap, inputs=[name_a, name_b, system_a, system_b, icon_a, icon_b], outputs=[name_a, name_b, system_a, system_b, icon_a, icon_b])
         undo_button_chat.click(undo_history, inputs=[chatbot], outputs=[chatbot])
 
-        view_button.click(view, inputs=[chatbot, name_a, name_b, system_a, system_b], outputs=[view_text])
+        view_button.click(view, inputs=[chatbot, name_a, name_b, icon_a, icon_b, system_a, system_b], outputs=[view_text])
+
+        icon_apply_button.click(apply_icon, inputs=[icon_a, icon_b], outputs=[chatbot])
 
     return simulate_interface

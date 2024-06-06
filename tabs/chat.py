@@ -49,6 +49,9 @@ def undo_history(history):
     pre_message = history[-1][0] if history else ""
     return pre_message, history[:-1]
 
+def apply_icon(user_icon, chatbot_icon):
+    return gr.update(avatar_images=[user_icon, chatbot_icon])
+
 def chat(user_avatar=None, chatbot_avatar=None):
     with gr.Blocks() as chat_interface:
         gr.Markdown("Chat用タブです。Shift+Enterでも送信できます。")
@@ -66,6 +69,16 @@ def chat(user_avatar=None, chatbot_avatar=None):
             undo_button_chat = gr.Button("Undo")
             clear_button = gr.ClearButton([user, chatbot, chatbot_beginning])
 
+        with gr.Accordion("Icon"):
+            with gr.Row():
+                with gr.Group():
+                    user_name = gr.Textbox(label="User name", value="user", lines=1)
+                    user_icon = gr.Image(label="User icon", type="filepath")
+                with gr.Group():
+                    chatbot_name = gr.Textbox(label="Chatbot name", value="chatbot", lines=1)
+                    chatbot_icon = gr.Image(label="Chatbot icon", type="filepath")
+            icon_apply_button = gr.Button("Apply", variant="primary")
+
         view_button = gr.Button("View", variant="secondary")
         view_text = gr.Markdown("")
         
@@ -78,6 +91,8 @@ def chat(user_avatar=None, chatbot_avatar=None):
         continue_button.click(chat_handler, inputs=[chatbot], outputs=[user, chatbot, generate_button, stop_button])
         undo_button_chat.click(undo_history, inputs=[chatbot], outputs=[user, chatbot])
 
-        view_button.click(view, inputs=[chatbot], outputs=[view_text])
+        view_button.click(view, inputs=[chatbot, user_name, chatbot_name, user_icon, chatbot_icon], outputs=[view_text])
+
+        icon_apply_button.click(apply_icon, inputs=[user_icon, chatbot_icon], outputs=[chatbot])
 
     return chat_interface
