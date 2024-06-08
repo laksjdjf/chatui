@@ -29,7 +29,13 @@ llama3 = (
 
 )
 
-template_list = ["cohere", "phi3", "swallow", "llama2", "llama3"]
+qwen = (
+    "<|im_start|>system\n{system}<|im_end|>",
+    "<|im_start|>user\n{user}<|im_end|>",
+    "<|im_start|>assistant\n{chatbot}<|im_end|>",
+)
+
+template_list = ["cohere", "phi3", "swallow", "llama2", "llama3", "qwen"]
 
 def get_template(template):
     if template == "cohere":
@@ -42,4 +48,6 @@ def get_template(template):
         return llama2
     elif template == "llama3":
         return llama3
+    elif template == "qwen":
+        return qwen
     return 
