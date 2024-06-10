@@ -1,0 +1,95 @@
+import gradio as gr
+from tabs.setting import eval_output, get_prompt
+import pandas as pd
+import numpy as np
+
+DEFAULT_PROMPT = """以下の問題の答えを選択肢から選んで記号のみを答えてください。
+分類:{category}
+問題:{problem}
+選択肢:
+A. {A}
+B. {B}
+C. {C}
+D. {D}
+E. {E}
+"""
+
+def problem_handler(prompt, csv_file, file_name):
+
+    df = pd.read_csv(csv_file)
+    prob_df = df[["category", "problem", "A", "B", "C", "D", "E"]]
+    ans_df = df[["正答", "大誤答"]]
+    answers = []
+
+    result = ""
+    collect = 0
+    daigoto = 0
+
+    for i in range(len(df)):
+        prob = prob_df.iloc[i].to_dict()
+        prompt_target = prompt.format(**prob)
+        
+        likelihoods, _, _ = eval_output(prompt_target, ["A", "B", "C", "D", "E"])
+        ans = ["A", "B", "C", "D", "E"][np.argmax(likelihoods)]
+        answers.append(ans)
+        if ans == ans_df.iloc[i]["正答"]:
+            res = "正解"
+            collect += 1
+        elif ans == ans_df.iloc[i]["大誤答"]:
+            res = "大誤答"
+            daigoto += 1
+        else:
+            res = "不正解"
+        result += f"問題{i+1}: {prob['problem']} \n 回答： {prob[ans]} \n 結果： {res} \n\n"
+        collect_result = f"\n問題数:{i+1}, 正答数:{collect}, 正答率:{collect/(i+1):.2%}, 大誤答数:{daigoto}"
+        yield gr.update(value=result + collect_result, autoscroll=True, interactive=True)
+    else:
+        pd.Series(answers).to_csv(f"output/{file_name}", index=False)
+        yield gr.update(value=result + collect_result, autoscroll=True, interactive=False)
+
+def update_prompt(user, post_prompt=None):
+    prompt = get_prompt(user, post_prompt)
+    return gr.update(value=prompt, autoscroll=True)
+
+def problem():
+    with gr.Blocks() as problem_interface:
+        gr.Markdown("テキスト評価用タブです。")
+
+        with gr.Row():
+            with gr.Column():
+                prompt_textbox = gr.Textbox(
+                    label="Input",
+                    placeholder="Enter your prompt here...",
+                    interactive=True,
+                    elem_classes=["prompt"],
+                    lines=3,
+                )
+                
+                default_button = gr.Button("Default")
+                eval_button = gr.Button("Evaluation", variant="primary")
+
+                user_textbox = gr.Textbox(label="input for default button", value=DEFAULT_PROMPT, lines=2)
+                csv_file = gr.File(label="CSVファイルをアップロード")
+
+            with gr.Column():
+                file_name_textbox = gr.Textbox(
+                    label="file_name",
+                    value="output.csv",
+                    placeholder="Enter your output file name here...",
+                    interactive=True,
+                )
+                result = gr.Textbox(label="Result", lines=5, interactive=False)
+        
+        eval_button.click(
+            problem_handler,
+            inputs=[prompt_textbox, csv_file, file_name_textbox],
+            outputs=[result]
+        )
+
+        default_button.click(
+            update_prompt,
+            inputs=[user_textbox],
+            outputs=[prompt_textbox],
+        )
+
+    return problem_interface

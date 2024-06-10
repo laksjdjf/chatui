@@ -201,7 +201,8 @@ def eval_output(input: str, outputs: list = []):
 
     for output in outputs:
         output_tokens = model.tokenize(output.encode("utf-8"), add_bos=False, special=True)
-        model.eval(output_tokens)
+        if len(output_tokens) > 1:
+            model.eval(output_tokens[:-1]) # last token is not needed for evaluation
         
         logprobs = Llama.logits_to_logprobs(model.eval_logits) # 対数確率
 
