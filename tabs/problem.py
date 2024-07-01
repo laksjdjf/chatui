@@ -1,5 +1,5 @@
 import gradio as gr
-from tabs.setting import eval_output, get_prompt
+from tabs.setting import eval_choice, get_prompt
 import pandas as pd
 import numpy as np
 
@@ -29,8 +29,7 @@ def problem_handler(prompt, csv_file, file_name):
         prob = prob_df.iloc[i].to_dict()
         prompt_target = prompt.format(**prob)
         
-        likelihoods, _, _ = eval_output(prompt_target, ["A", "B", "C", "D", "E"])
-        ans = ["A", "B", "C", "D", "E"][np.argmax(likelihoods)]
+        ans = eval_choice(prompt_target, ["A", "B", "C", "D", "E"])
         answers.append(ans)
         if ans == ans_df.iloc[i]["正答"]:
             res = "正解"

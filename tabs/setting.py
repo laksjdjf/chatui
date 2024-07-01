@@ -182,6 +182,23 @@ def find_first_difference_index(list1, list2):
     
     return min_length
 
+def eval_choice(input: str, choices: list):
+    global model, config
+
+    input_tokens = model.tokenize(input.encode("utf-8"), special=True) # bos含む
+
+    # 入力トークンが変更された位置を計算
+    first_diff_index = find_first_difference_index(model._input_ids.tolist(), input_tokens)
+    
+    if first_diff_index < len(input_tokens):
+        model.n_tokens = first_diff_index # 変更されていないトークンまでは維持
+        model.eval(input_tokens[first_diff_index:]) # 変更されたトークンを評価
+    
+    output_tokens = [model.tokenize(choice.encode("utf-8"), add_bos=False, special=True)[0] for choice in choices]
+
+    choice = model._scores[-1][output_tokens].argmax()
+    return choices[choice]
+
 def eval_output(input: str, outputs: list = []):
     global model, config
     

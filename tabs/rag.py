@@ -7,6 +7,12 @@ from transformers import AutoTokenizer, AutoModel
 import torch
 from tqdm import tqdm
 
+try:
+    from pdfminer.high_level import extract_text
+    SUPPORT_PDF = True
+except:
+    SUPPORT_PDF = False
+
 pre_prompt = ""
 stop_generate = False
 
@@ -85,8 +91,13 @@ class FaissTextRetrieval:
 
 def chunk_text(file_path: str, chunk_size: int = 256, overlap: int = 20) -> list:
     
-    with open(file_path, 'r', encoding='utf-8') as file:
-        text = file.read()
+    if file_path.endswith(".pdf"):
+        if not SUPPORT_PDF:
+            raise Exception("PDF files are not supported. Please install pdfminer.six to use PDF files.")
+        text = extract_text(file_path)
+    else:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            text = file.read()
     
     chunks = []
     current_pos = 0
