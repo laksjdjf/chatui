@@ -68,7 +68,7 @@ def arena_handler(prompt_template, player, file_name):
         avg_prob[i] = prob_i / num_games[i] + avg_prob[i] * (num_games[i] - 1) / num_games[i]
         avg_prob[j] = prob_j / num_games[j] + avg_prob[j] * (num_games[j] - 1) / num_games[j]
 
-        label = {player+ "/" + str(int(rating)):rating / 2000 for player, rating in zip(players, ratings)}
+        label = {player+ "/" +f"{win}勝{lose}敗" + "/" + str(int(rating)):win/(win+lose) if win+lose > 0 else 0 for player, rating, win, lose in zip(players, ratings, wins, losses)}
 
         yield gr.update(value=f"{count+1}/{len(round_robin)}"), gr.update(value=label), None
     else:
@@ -86,7 +86,7 @@ def arena_handler(prompt_template, player, file_name):
         yield gr.update(value=f"完了！"), gr.update(value=label), gr.update(value=df)
 
 def update_prompt(post_prompt=None):
-    prompt = get_prompt("<input>", post_prompt)
+    prompt = get_prompt("以下の選択肢からより***を選んで記号のみ答えてください。\nA. {player1}\nB. {player2}", post_prompt)
     return gr.update(value=prompt, autoscroll=True)
 
 def arena():
