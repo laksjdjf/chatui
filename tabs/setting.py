@@ -221,10 +221,11 @@ def eval_output(input: str, outputs: list = []):
         if len(output_tokens) > 1:
             model.eval(output_tokens[:-1]) # last token is not needed for evaluation
         
-        logprobs = Llama.logits_to_logprobs(model.eval_logits) # 対数確率
+        scores = model._scores[range(len(input_tokens)-1, len(input_tokens) + len(output_tokens) - 1)]
+        logprobs = torch.nn.functional.log_softmax(torch.from_numpy(scores), dim=-1).numpy()
 
         # inputの最後（outputの最初の予測）からoutputの最後から二番目（outputの最後の予測）までの対数確率を取得
-        logprobs_target = logprobs[range(len(input_tokens)-1, len(input_tokens) + len(output_tokens) - 1), torch.tensor(output_tokens)]
+        logprobs_target = logprobs[:, output_tokens]
         
         if config.debug:
             print(logprobs_target.shape)
