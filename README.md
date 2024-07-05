@@ -3,7 +3,7 @@
 [gradio](https://www.gradio.app/)および[llama-cpp-python](https://github.com/abetlen/llama-cpp-python)を利用したUIです。変な機能しかありません。
 
 # 起動方法
-gradio(4.37.2推奨)とllama-cpp-pythonを好きにインストールしてください。
+gradio(4.37.2 or 4.29.0推奨)とllama-cpp-pythonを好きにインストールしてください。
 RAGタブを利用する場合はfaiss-cpu（とPDFを入れる場合はpdfminer)が必要です。
 ```
 pip install gradio==4.37.2
