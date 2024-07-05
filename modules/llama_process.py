@@ -107,6 +107,7 @@ def load_logits_processor(languages):
 def load_model(model_dir, model_name, ngl, ctx, ts, n_batch, flash_attn, no_kv_offload, type_kv, logits_all):
     global model
     del model
+    model = None # error handling
     model_path = os.path.join(model_dir, model_name)
     ts = [float(x) for x in ts.split(",")] if ts else None
     model = Llama(
@@ -129,6 +130,18 @@ def clear_model():
     del model
     model = None
     return "Model cleared."
+
+def load_state(state):
+    global model
+    model.load_state(state)
+
+def save_state():
+    global model
+    return model.save_state()
+
+def get_n_tokens(): 
+    global model
+    return model.n_tokens
 
 def get_prompt_from_messages(messages, input_message, add_system=False):
     return config.get_prompt_from_messages(messages, input_message, add_system=add_system)
@@ -207,7 +220,7 @@ def eval_output(input: str, outputs: list = []):
 
     return likelihoods, log_likelihoods, num_tokens
 
-def eval_text(text:str, threshold:float):
+def eval_text(text:str, relative: bool = False):
     global model, config
 
     if not model.context_params.logits_all:
@@ -227,10 +240,10 @@ def eval_text(text:str, threshold:float):
     logprobs_target = logprobs[range(0, len(tokens) - 1), tokens[1:]]
     logprobs_max = logprobs.max(axis=1)[:1]
 
-    # 確率が最大値に比べて閾値以下のトークンをtypoとして返す
-    # exp(logprobs_target) < exp(logprobs_max) * thresholdの対数をとっています。
-    typo = logprobs_target < (logprobs_max + np.log(threshold))
-    typo = typo.tolist()
+    if relative:
+        result = np.exp(logprobs_target - logprobs_max).tolist()
+    else:
+        result = np.exp(logprobs_target).tolist()
     
     log_likelihood = logprobs_target.sum()
     perplexity = np.exp(-log_likelihood / (len(tokens) - 1)) # 確率の逆数の相乗平均
@@ -243,7 +256,7 @@ def eval_text(text:str, threshold:float):
         except:
             text_splited.append("◆")
 
-    return perplexity, typo, text_splited
+    return perplexity, result, text_splited
 
 def eval_choice(input: str, choices: list):
     global model, config

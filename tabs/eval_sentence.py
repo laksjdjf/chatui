@@ -1,21 +1,22 @@
 import gradio as gr
 from modules.llama_process import eval_text
 
-def eval_sentence_handler(text, threshold):
-
-    perplexity, typo, text_splited = eval_text(text, threshold)
-
+def eval_sentence_handler(text, relative, threshold):
+    perplexity, result, text_splited = eval_text(text, relative)
     texts = ""
-    for b, text in zip(typo, text_splited):
-        if b:
-            texts += f"<span style='color:red'>{text}</span>"
-        else:
-            texts += f"{text}"
+    for i, text in enumerate(text_splited):
+        texts += get_color(text, result[i], threshold)
 
     return perplexity, texts
 
+def get_color(text, prob, threshold):
+    colors = ["#0000FF", "#00BFFF", "#32CD32", "#FFA500", "#FF0000"]
+    thresholds = [float(t.strip()) for t in threshold.split(",")]
+    color = [color for threshold, color in zip(thresholds, colors) if prob >= threshold][-1]
+    return f'<span style="color:{color}">{text}</span>'
+
 def eval_sentence():
-    with gr.Blocks() as typo_checker_interface:
+    with gr.Blocks() as eval_sentence_interface:
         gr.Markdown("テキスト評価用タブです。")
 
         with gr.Row():
@@ -25,20 +26,21 @@ def eval_sentence():
                     placeholder="Enter your text here...",
                     interactive=True,
                     elem_classes=["prompt"],
-                    lines=3,
+                    lines=6,
                 )
                 
-                threshold = gr.Slider(label="Threshold", minimum=0, maximum=1, step=0.001, value=0.1)
+                relative = gr.Checkbox(label="Relative", value=False)
+                thresholds = gr.Textbox("0.0, 0.2, 0.4, 0.6, 0.8", label="Thresholds", lines=1)
                 eval_button = gr.Button("Evaluation", variant="primary")
 
             with gr.Column():
                 perplexity = gr.Textbox(label=f"Perplexity", interactive=False,lines=1)
-                output = gr.Markdown("")
+                output = gr.Markdown(label="Output")
         
 
         eval_button.click(
             eval_sentence_handler,
-            inputs=[textbox, threshold],
+            inputs=[textbox, relative, thresholds],
             outputs=[perplexity, output]
         )
-    return typo_checker_interface
+    return eval_sentence_interface

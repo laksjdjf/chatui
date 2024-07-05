@@ -47,4 +47,4 @@ if __name__ == "__main__":
         theme=gr.themes.Base()
     )
 
-    demo.launch(share = args.share)
+    demo.launch(share = args.share, allowed_paths=["/"])

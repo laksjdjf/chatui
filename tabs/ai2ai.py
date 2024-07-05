@@ -1,5 +1,5 @@
 import gradio as gr
-from modules.llama_process import generate, get_prompt_from_messages
+from modules.llama_process import generate, get_prompt_from_messages, load_state, save_state, get_n_tokens
 from modules.utils import view
 
 stop_generate = False
@@ -8,9 +8,10 @@ def stop():
     global stop_generate
     stop_generate = True
 
-def ai2ai_handler(history, system_a, system_b, first_message, n_completion):
+def ai2ai_handler(history, system_a, system_b, first_message, n_completion, cache_state_threshold):
     global stop_generate
     stop_generate = False
+    state = None
 
     current_message_b = first_message
 
@@ -29,12 +30,23 @@ def ai2ai_handler(history, system_a, system_b, first_message, n_completion):
         if stop_generate:
             break
 
+        if cache_state_threshold < get_n_tokens():
+            state = save_state()
+        else:
+            state = None
+        
+        if state is not None:
+            load_state(state)
+
         for text in generate(prompt):
             if stop_generate:
                 break
 
             current_message_a += text
             yield history + [(current_message_a, "")], gr.update(visible=False), gr.update(visible=True)
+
+        if cache_state_threshold < get_n_tokens():
+            state = save_state()
 
         # Aが話しかけてBが返事をする。
         messages = [{"role": "system", "content": system_b}]
@@ -44,14 +56,22 @@ def ai2ai_handler(history, system_a, system_b, first_message, n_completion):
         messages.append({"role": "user", "content": current_message_a})
         input_message = {"role": "assistant", "content": ""}
         prompt = get_prompt_from_messages(messages, input_message, add_system=False)
+
         
         current_message_b = ""
+
+        if state is not None:
+            load_state(state)
+
         for text in generate(prompt):
             if stop_generate:
                 break
 
             current_message_b += text
             yield history + [(current_message_a, current_message_b)], gr.update(visible=False), gr.update(visible=True)
+        
+        if cache_state_threshold < get_n_tokens():
+            state = save_state()
 
         history.append((current_message_a, current_message_b))
 
@@ -88,7 +108,8 @@ def ai2ai():
             first_message = gr.Textbox(label="First message", placeholder="Enter your message here...", lines=2)
             swap_button = gr.Button("Swap")
 
-        n_completion = gr.Slider(1, 20, value=1, step=1, label="Number of completion")
+            n_completion = gr.Slider(1, 20, value=1, step=1, label="Number of completion")
+            cache_state_threshold = gr.Slider(0, 65536, value=65536, step=1, label="Cache state if num_tokens >=")
     
         with gr.Row():    
             undo_button_chat = gr.Button("Undo")
@@ -97,7 +118,7 @@ def ai2ai():
         view_button = gr.Button("View", variant="secondary")
         view_text = gr.Markdown("")
 
-        generate_button.click(ai2ai_handler, inputs=[chatbot, system_a, system_b, first_message, n_completion], outputs=[chatbot, generate_button, stop_button])
+        generate_button.click(ai2ai_handler, inputs=[chatbot, system_a, system_b, first_message, n_completion, cache_state_threshold], outputs=[chatbot, generate_button, stop_button])
         stop_button.click(stop)
 
         swap_button.click(swap, inputs=[name_a, name_b, system_a, system_b, icon_a, icon_b], outputs=[name_a, name_b, system_a, system_b, icon_a, icon_b])

@@ -4,14 +4,14 @@ from modules.llama_process import load_model, clear_model, load_config, get_gbnf
 from modules.templates import get_template, template_list
 
 def update_model_list(model_dir):
-    return gr.update(choices=[model for model in os.listdir(model_dir)])
+    return gr.update(choices=[model for model in os.listdir(model_dir) if model.endswith(".gguf")])
 
 def setting(model_dir):
     with gr.Blocks() as setting_interface:
         with gr.Accordion("モデルのロード"):
             model_dir_state = gr.State(model_dir)
             with gr.Row():
-                model_name = gr.Dropdown([model for model in os.listdir(model_dir)], label="model_name", scale=10)
+                model_name = gr.Dropdown([model for model in os.listdir(model_dir) if model.endswith(".gguf")], label="model_name", scale=10)
                 update_button = gr.Button(value="リスト更新🔄", variant="primary", scale=1)
             ngl = gr.Slider(label="n_gpu_layers", minimum=0, maximum=256, step=1, value=256)
             ctx = gr.Slider(label="n_ctx", minimum=256, maximum=256000, step=256, value = 4096)
