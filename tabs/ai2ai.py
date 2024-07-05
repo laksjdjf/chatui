@@ -1,5 +1,6 @@
 import gradio as gr
-from tabs.setting import generate, get_prompt_from_history, view
+from modules.llama_process import generate, get_prompt_from_messages
+from modules.utils import view
 
 stop_generate = False
 
@@ -7,20 +8,23 @@ def stop():
     global stop_generate
     stop_generate = True
 
-def chat_handler(history_b, system_a, system_b, first_message, n_completion):
+def ai2ai_handler(history, system_a, system_b, first_message, n_completion):
     global stop_generate
     stop_generate = False
 
-    if len(history_b) > 0:
-        chat_b = history_b[-1][1]
-        history_a = [(first_message, history_b[0][0])] + [(history_b[i-1][1], history_b[i][0]) for i in range(1, len(history_b))]
-    else:
-        chat_b = first_message
-        history_a = []
+    current_message_b = first_message
 
     for i in range(n_completion):
-        chat_a = ""
-        prompt = get_prompt_from_history(history_a, chat_b, system=system_a)
+        current_message_a = ""
+
+        # Bが話しかけてAが返事をする。
+        messages = [{"role": "system", "content": system_a}]
+        for message_a, message_b in history:
+            messages.append({"role": "user", "content": message_b})
+            messages.append({"role": "assistant", "content": message_a})
+        messages.append({"role": "user", "content": current_message_b})
+        input_message = {"role": "assistant", "content": ""}
+        prompt = get_prompt_from_messages(messages, input_message, add_system=False)
         
         if stop_generate:
             break
@@ -29,24 +33,29 @@ def chat_handler(history_b, system_a, system_b, first_message, n_completion):
             if stop_generate:
                 break
 
-            chat_a += text
-            yield history_b + [(chat_a, "")], gr.update(visible=False), gr.update(visible=True)
-        
-        history_a.append((chat_b, chat_a))
+            current_message_a += text
+            yield history + [(current_message_a, "")], gr.update(visible=False), gr.update(visible=True)
 
-        prompt = get_prompt_from_history(history_b, chat_a, system=system_b)
-        chat_b = ""
+        # Aが話しかけてBが返事をする。
+        messages = [{"role": "system", "content": system_b}]
+        for message_a, message_b in history:
+            messages.append({"role": "user", "content": message_a})
+            messages.append({"role": "assistant", "content": message_b})
+        messages.append({"role": "user", "content": current_message_a})
+        input_message = {"role": "assistant", "content": ""}
+        prompt = get_prompt_from_messages(messages, input_message, add_system=False)
+        
+        current_message_b = ""
         for text in generate(prompt):
             if stop_generate:
                 break
 
-            chat_b += text
-            yield history_b + [(chat_a, chat_b)], gr.update(visible=False), gr.update(visible=True)
+            current_message_b += text
+            yield history + [(current_message_a, current_message_b)], gr.update(visible=False), gr.update(visible=True)
 
-        
-        history_b.append((chat_a, chat_b))
+        history.append((current_message_a, current_message_b))
 
-    yield history_b, gr.update(visible=True), gr.update(visible=False)
+    yield history, gr.update(visible=True), gr.update(visible=False)
 
 def undo_history(history):
     return history[:-1]
@@ -57,10 +66,13 @@ def swap(name_a, name_b, system_a, system_b, icon_a, icon_b):
 def apply_icon(user_icon, chatbot_icon):
     return gr.update(avatar_images=[user_icon, chatbot_icon])
 
-def simulate(user_avatar=None, chatbot_avatar=None):
-    with gr.Blocks() as simulate_interface:
+def ai2ai():
+    with gr.Blocks() as ai2ai_interface:
         gr.Markdown("AI同士に会話させるタブです。")
-        chatbot = gr.Chatbot(layout="panel")
+        chatbot = gr.Chatbot(height=600)
+
+        generate_button = gr.Button("Generate", variant="primary")
+        stop_button = gr.Button("Stop", visible=False)
 
         with gr.Accordion("System setting"):
             with gr.Row():
@@ -77,9 +89,6 @@ def simulate(user_avatar=None, chatbot_avatar=None):
             swap_button = gr.Button("Swap")
 
         n_completion = gr.Slider(1, 20, value=1, step=1, label="Number of completion")
-
-        generate_button = gr.Button("Generate", variant="primary")
-        stop_button = gr.Button("Stop", visible=False)
     
         with gr.Row():    
             undo_button_chat = gr.Button("Undo")
@@ -88,7 +97,7 @@ def simulate(user_avatar=None, chatbot_avatar=None):
         view_button = gr.Button("View", variant="secondary")
         view_text = gr.Markdown("")
 
-        generate_button.click(chat_handler, inputs=[chatbot, system_a, system_b, first_message, n_completion], outputs=[chatbot, generate_button, stop_button])
+        generate_button.click(ai2ai_handler, inputs=[chatbot, system_a, system_b, first_message, n_completion], outputs=[chatbot, generate_button, stop_button])
         stop_button.click(stop)
 
         swap_button.click(swap, inputs=[name_a, name_b, system_a, system_b, icon_a, icon_b], outputs=[name_a, name_b, system_a, system_b, icon_a, icon_b])
@@ -98,4 +107,4 @@ def simulate(user_avatar=None, chatbot_avatar=None):
 
         icon_apply_button.click(apply_icon, inputs=[icon_a, icon_b], outputs=[chatbot])
 
-    return simulate_interface
+    return ai2ai_interface

@@ -1,5 +1,5 @@
 import gradio as gr
-from tabs.setting import eval_choice, get_prompt
+from modules.llama_process import eval_choice, get_prompt_from_messages, get_default_prompt
 import pandas as pd
 import numpy as np
 
@@ -46,13 +46,9 @@ def problem_handler(prompt, csv_file, file_name):
         pd.Series(answers).to_csv(f"output/{file_name}", index=False)
         yield gr.update(value=result + collect_result, autoscroll=True, interactive=False)
 
-def update_prompt(user, post_prompt=None):
-    prompt = get_prompt(user, post_prompt)
-    return gr.update(value=prompt, autoscroll=True)
-
 def problem():
     with gr.Blocks() as problem_interface:
-        gr.Markdown("テキスト評価用タブです。")
+        gr.Markdown("問題を解かせるタブです。")
 
         with gr.Row():
             with gr.Column():
@@ -86,7 +82,7 @@ def problem():
         )
 
         default_button.click(
-            update_prompt,
+            get_default_prompt,
             inputs=[user_textbox],
             outputs=[prompt_textbox],
         )

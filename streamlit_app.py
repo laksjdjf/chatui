@@ -2,12 +2,13 @@ import streamlit as st
 import os
 import sys
 from llama_cpp import Llama
+from tabs.templates import get_template, template_list
 
 model_dir = sys.argv[1]
 USER_NAME = "user"
 ASSISTANT_NAME = "assistant"
 
-def load_model(model_name, ngl=256, ctx=512, ts=None, n_batch=512, flash_attn=True):
+def load_model(model_name, ngl=256, ctx=512, ts=None, n_batch=512, flash_attn=True, no_kv_offload=False):
     model_path = os.path.join(model_dir, model_name)
     ts = [float(x) for x in ts.split(",")] if ts else None
     model = Llama(
@@ -16,7 +17,8 @@ def load_model(model_name, ngl=256, ctx=512, ts=None, n_batch=512, flash_attn=Tr
         n_batch=n_batch,
         tensor_split=ts,
         n_ctx=ctx,
-        flash_attn=flash_attn
+        flash_attn=flash_attn,
+        offload_kqv=not no_kv_offload,
     )
     return model
 
@@ -36,7 +38,8 @@ def generate(model, prompt, temperature, top_p, max_tokens, repeat_penalty, debu
     ):
         yield chunk["choices"][0]["text"]
 
-def get_prompt_from_history(history, system_template, user_template, chatbot_template):
+def get_prompt_from_history(history, template):
+    system_template, user_template, chatbot_template = get_template(template)
     prompt = system_template.format(system=system)
     for i, data in enumerate(history):
         if i == len(history) - 1:
@@ -67,7 +70,7 @@ if __name__ == "__main__":
             no_kv_offload = st.checkbox("no_kv_offload", value=False)
 
             if st.button("Load Model", type="primary"):
-                st.session_state.model = load_model(selected_model, ngl, ctx, ts, n_batch, flash_attn)
+                st.session_state.model = load_model(selected_model, ngl, ctx, ts, n_batch, flash_attn, no_kv_offload)
                 st.session_state.model_name = selected_model
                 st.success(f"Model '{selected_model}' loaded successfully!")
 
@@ -77,9 +80,7 @@ if __name__ == "__main__":
             top_p = st.slider("top_p", min_value=0.0, max_value=1.0, step=0.01, value=0.9)
             max_tokens = st.slider("max_tokens", min_value=32, max_value=4096, step=32, value=256)
             repeat_penalty = st.slider("repeat_penalty", min_value=0.0, max_value=1.0, step=0.01, value=1.0)
-            system_template = st.text_area("system_template", value="<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>{system}<|END_OF_TURN_TOKEN|>")
-            user_template = st.text_area("user_template", value="<|START_OF_TURN_TOKEN|><|USER_TOKEN|>{user}<|END_OF_TURN_TOKEN|>")
-            chatbot_template = st.text_area("chatbot_template", value="<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>{chatbot}<|END_OF_TURN_TOKEN|>")
+            template = st.selectbox("template", template_list)
             debug = st.checkbox("debug", value=False)
 
     if "chat_log" not in st.session_state:
@@ -108,19 +109,19 @@ if __name__ == "__main__":
                 if st.button("Save", key=f"save_{i}", type="primary"):
                     st.session_state.chat_log[i]["content"] = st.session_state.edit_msg
                     st.session_state.edit_mode = -1
-                    st.experimental_rerun()
+                    st.rerun()
                 if st.button("Delate", key=f"delete_{i}"):
                     st.session_state.chat_log.pop(i)
                     st.session_state.edit_mode = -1
-                    st.experimental_rerun()
+                    st.rerun()
                 if st.button("Cancel", key=f"cancel_{i}"):
                     st.session_state.edit_mode = -1
-                    st.experimental_rerun()
+                    st.rerun()
             else:
                 if st.button("Edit", key=f"edit_{i}"):
                     st.session_state.edit_mode = i
                     st.session_state.edit_msg = chat["content"]
-                    st.experimental_rerun()
+                    st.rerun()
                     
     user_msg = st.chat_input("ここにメッセージを入力")
     
@@ -133,7 +134,7 @@ if __name__ == "__main__":
         
         messages = st.chat_message(ASSISTANT_NAME)
         st.session_state.chat_log.append({"role": ASSISTANT_NAME, "content": ""})
-        prompt = get_prompt_from_history(st.session_state.chat_log, system_template, user_template, chatbot_template)
+        prompt = get_prompt_from_history(st.session_state.chat_log, template)
         content = st.session_state.chat_log[-1]["content"]
         with messages:
             msg = st.empty()
@@ -141,23 +142,23 @@ if __name__ == "__main__":
                 content += chunk
                 msg.write(content)
         st.session_state.chat_log[-1]["content"] = content
-        st.experimental_rerun()
+        st.rerun()
     
-    col1, col2, col3 = st.columns([1, 1, 1])
+    col1, col2, _, col3 = st.columns([1, 1, 2, 1])
     with col1:
         if st.button("Add User"):
             st.session_state.chat_log.append({"role": USER_NAME, "content": ""})
-            st.experimental_rerun()
+            st.rerun()
     with col2:
         if st.button("Add Assistant"):
             st.session_state.chat_log.append({"role": ASSISTANT_NAME, "content": ""})
-            st.experimental_rerun()
+            st.rerun()
     with col3:
         if st.button("Clear Chat Log"):
             st.session_state.chat_log = []
-            st.experimental_rerun()
+            st.rerun()
     if st.button("Continue", type="primary"):
-        prompt = get_prompt_from_history(st.session_state.chat_log, system_template, user_template, chatbot_template)
+        prompt = get_prompt_from_history(st.session_state.chat_log, template)
         content = st.session_state.chat_log[-1]["content"]
         with messages:
             msg = st.empty()
@@ -165,4 +166,4 @@ if __name__ == "__main__":
                 content += chunk
                 msg.write(content)
         st.session_state.chat_log[-1]["content"] = content
-        st.experimental_rerun()
+        st.rerun()

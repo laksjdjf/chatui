@@ -1,5 +1,5 @@
 import gradio as gr
-from tabs.setting import eval_output, get_prompt
+from modules.llama_process import eval_output, get_prompt_from_messages, get_default_prompt
 import pandas as pd
 import os
 
@@ -85,13 +85,15 @@ def arena_handler(prompt_template, player, file_name):
         df.to_csv(f"output/{file_name}")
         yield gr.update(value=f"完了！"), gr.update(value=label), gr.update(value=df)
 
-def update_prompt(post_prompt=None):
-    prompt = get_prompt("以下の選択肢からより***を選んで記号のみ答えてください。\nA. {player1}\nB. {player2}", post_prompt)
+def update_prompt():
+    messages = [{"role": "user", "content": "以下の選択肢からより**な**をを選んで記号のみ答えてください。\nA. {player1}\nB. {player2}"}]
+    input_message = {"role": "assistant", "content": ""}
+    prompt = get_prompt_from_messages(messages, input_message, add_system=True)
     return gr.update(value=prompt, autoscroll=True)
 
 def arena():
     with gr.Blocks() as arena_interface:
-        gr.Markdown("テキスト評価用タブです。")
+        gr.Markdown("単語のランキングを作るタブです。")
 
         with gr.Row():
             with gr.Column():
@@ -118,6 +120,8 @@ def arena():
                 default_button = gr.Button("Default")
                 eval_button = gr.Button("Evaluation", variant="primary")
 
+                input_textbox = gr.Textbox(label="input for default button", value="以下の選択肢からより**な**をを選んで記号のみ答えてください。\nA. {player1}\nB. {player2}", lines=2)
+
             with gr.Column():
                 progress = gr.Textbox(label="Progress", value="0/0")
                 label = gr.Label("Result", num_top_classes=30)
@@ -127,7 +131,6 @@ def arena():
                     interactive=False,
                 )
         
-
         eval_button.click(
             arena_handler,
             inputs=[prompt_textbox, player_textbox, output_textbox],
@@ -135,7 +138,8 @@ def arena():
         )
 
         default_button.click(
-            update_prompt,
+            get_default_prompt,
+            inputs=[input_textbox],
             outputs=[prompt_textbox],
         )
 

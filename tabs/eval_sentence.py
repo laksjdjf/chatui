@@ -1,8 +1,7 @@
 import gradio as gr
-from tabs.setting import eval_text, get_prompt
-import pandas as pd
+from modules.llama_process import eval_text
 
-def typo_check_handler(text, threshold):
+def eval_sentence_handler(text, threshold):
 
     perplexity, typo, text_splited = eval_text(text, threshold)
 
@@ -15,7 +14,7 @@ def typo_check_handler(text, threshold):
 
     return perplexity, texts
 
-def typo_checker():
+def eval_sentence():
     with gr.Blocks() as typo_checker_interface:
         gr.Markdown("テキスト評価用タブです。")
 
@@ -38,7 +37,7 @@ def typo_checker():
         
 
         eval_button.click(
-            typo_check_handler,
+            eval_sentence_handler,
             inputs=[textbox, threshold],
             outputs=[perplexity, output]
         )

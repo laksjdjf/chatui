@@ -1,5 +1,5 @@
 import gradio as gr
-from tabs.setting import generate, get_prompt
+from modules.llama_process import generate, get_prompt_from_messages, get_config
 
 pre_prompt = ""
 stop_generate = False
@@ -25,29 +25,33 @@ def completion_handler(prompt):
 def undo_prompt():
     return gr.update(value=pre_prompt)
 
-def update_prompt(user, post_prompt=None):
-    prompt = get_prompt(user, post_prompt)
+def update_prompt(user, pre_prompt=None):
+    messages = [{"role": "user", "content": user}]
+    input_message = {"role": "assistant", "content": ""}
+    prompt = get_prompt_from_messages(messages, input_message, add_system=pre_prompt is None)
+    if pre_prompt:
+        prompt = pre_prompt + get_config().assistant_suffix + prompt
     return gr.update(value=prompt, autoscroll=True)
 
 def completion():
     with gr.Blocks() as completion_interface:
-        gr.Markdown("Completion用タブです。設定したテンプレートは無視されます。Defaultボタンを押すか、自分で書いてください。Shift+Enterでも送信できます。")
+        gr.Markdown("Completion用タブです。Shift+Enterでも送信できます。")
         prompt_textbox = gr.Textbox(
             label="Input/Output",
             placeholder="Enter your prompt here...",
             interactive=True,
-            elem_classes=["prompt"],
             lines=5,
         )
 
         generate_button = gr.Button("Generate", variant="primary")
         stop_button = gr.Button("Stop", visible=False)
+
         with gr.Row():
             undo_button = gr.Button("Undo")
             default_button = gr.Button("Default")
             add_button = gr.Button("Add Input")
 
-        user_textbox = gr.Textbox(label="user", value="こんにちんぽ", lines=3)
+        user_textbox = gr.Textbox(label="user", value="", lines=3)
 
         prompt_textbox.submit(
             completion_handler,
