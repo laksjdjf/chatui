@@ -37,6 +37,50 @@ ggufファイルがあるディレクトリを指定して起動します。
 
 ## Completion
 自由な入力ができるタブです。結果はEOSを除いて入力欄に直接追加されます。
+
 user部分に何らかの質問をし、Defaultボタンを押すとチャットテンプレートが自動的に作成されます。
+
 Undoは一個前までしか戻せません。ーｑ－
+
+## likelihood
+入力と出力を与えて、出力の尤度を計算するタブです。
+
+**利用する場合は、モデルロード時にlogits_allのチェックをつけてください。**
+
+Defaultボタンでinput for default buttonの内容からチャットテンプレートが作成されます。
+
+## EvalSentence
+与えられた文章のperplexityを計算するほか、予測確率がthreshold以下のトークンを可視化できます。
+**利用する場合は、モデルロード時にlogits_allのチェックをつけてください。**
+
+## Problem
+AIに選択問題を与えて回答させます。
+
+category, problem, A, B, C, D, E, 正解, 大誤答のcsvファイルを入力することで選択問題を解かせることができます。
+
+正解及び大誤答はラベル（AとかB）です。
+## Arena
+AIに単語をいっぱい与えて、総当たりで競わせます。
+
+カンマ区切りで単語列を与えることでランキングがつくれます。
+
+## RAG
+なんちゃってRAGができます。
+
+Embedding Model欄でテキストファイルもしくはPDF（pdfminer install時のみ）を与えて、ロードを押すことでRAGができます。
+
+Number of AugmentationsはAIに与えるChunkの数になります。
+
+[intfloat/multilingual-e5-large](https://huggingface.co/intfloat/multilingual-e5-large)以外では動かないと思います。
+
+## AI2AI
+AI同士の会話を再現します。
+
+二つのシステムプロンプトを与えるとA→Bの順番で話し出します。
+
+Aに対しては最初にfirst_messageが与えられます。あまり意味のない会話を促すようなものを入力するとよいでしょう。
+
+Number of completionで会話の往復回数を設定できます。
+
+
 
