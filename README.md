@@ -16,7 +16,9 @@ pip install faiss-cpu pdfminer.six
 
 ggufファイルがあるディレクトリを指定して起動します。
 
-```python main.py -m <gguf-directory>```
+```
+python main.py -m <gguf-directory>
+```
 
 ※`--share`でshareできます。
 
