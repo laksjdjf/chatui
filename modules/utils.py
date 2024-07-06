@@ -2,14 +2,13 @@ import shutil
 
 def view(history, name_a, name_b, icon_a=None, icon_b=None, system_a=None, system_b=None):
     if icon_a:
-        icon_a_copy = "tmp/icon_a.png"
+        icon_a_copy = "tmp/" + icon_a.split("/")[-1]
         shutil.copy(icon_a, icon_a_copy)
         name_a = f'<img src="/file/{icon_a_copy}" width="30">'
-        print(name_a)
     else:
         name_a += ":"
     if icon_b:
-        icon_b_copy = "tmp/icon_b.png"
+        icon_b_copy = "tmp/" + icon_b.split("/")[-1]
         shutil.copy(icon_b, icon_b_copy)
         name_b = f'<img src="/file/{icon_b_copy}" width="30">'
     else:

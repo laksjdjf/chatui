@@ -13,22 +13,20 @@ def ai2ai_handler(history, system_a, system_b, first_message, n_completion, cach
     stop_generate = False
     state = None
 
-    current_message_b = first_message
-
     for i in range(n_completion):
-        current_message_a = ""
-
+        
         # Bが話しかけてAが返事をする。
-        messages = [{"role": "system", "content": system_a}]
+        messages = [{"role": "system", "content": system_a}, {"role": "user", "content": first_message}]
         for message_a, message_b in history:
-            messages.append({"role": "user", "content": message_b})
             messages.append({"role": "assistant", "content": message_a})
-        messages.append({"role": "user", "content": current_message_b})
+            messages.append({"role": "user", "content": message_b})
         input_message = {"role": "assistant", "content": ""}
         prompt = get_prompt_from_messages(messages, input_message, add_system=False)
         
         if stop_generate:
             break
+
+        current_message_a = ""
 
         if cache_state_threshold < get_n_tokens():
             state = save_state()
@@ -57,7 +55,6 @@ def ai2ai_handler(history, system_a, system_b, first_message, n_completion, cach
         input_message = {"role": "assistant", "content": ""}
         prompt = get_prompt_from_messages(messages, input_message, add_system=False)
 
-        
         current_message_b = ""
 
         if state is not None:
@@ -89,21 +86,21 @@ def apply_icon(user_icon, chatbot_icon):
 def ai2ai():
     with gr.Blocks() as ai2ai_interface:
         gr.Markdown("AI同士に会話させるタブです。")
-        chatbot = gr.Chatbot(height=600)
+        chatbot = gr.Chatbot(height=600, layout="panel")
 
         generate_button = gr.Button("Generate", variant="primary")
         stop_button = gr.Button("Stop", visible=False)
 
         with gr.Accordion("System setting"):
-            with gr.Row():
-                with gr.Group():
-                    name_a = gr.Textbox(label="Name A", placeholder="Enter your name here...", lines=1)
-                    icon_a = gr.Image(label="Icon A", type="filepath")
-                    system_a = gr.Textbox(label="System A", placeholder="Enter your message here...", lines=3)
+            with gr.Row():                
                 with gr.Group():
                     name_b = gr.Textbox(label="Name B", placeholder="Enter your name here...", lines=1)
                     icon_b = gr.Image(label="Icon B", type="filepath")
                     system_b = gr.Textbox(label="System B", placeholder="Enter your message here...", lines=3)
+                with gr.Group():
+                    name_a = gr.Textbox(label="Name A", placeholder="Enter your name here...", lines=1)
+                    icon_a = gr.Image(label="Icon A", type="filepath")
+                    system_a = gr.Textbox(label="System A", placeholder="Enter your message here...", lines=3)
             icon_apply_button = gr.Button("Apply Icon", variant="primary")
             first_message = gr.Textbox(label="First message", placeholder="Enter your message here...", lines=2)
             swap_button = gr.Button("Swap")
