@@ -52,7 +52,7 @@ Undoは一個前までしか戻せません。ーｑ－
 Defaultボタンでinput for default buttonの内容からチャットテンプレートが作成されます。
 
 ## EvalSentence
-与えられた文章のperplexityを計算するほか、予測確率がthreshold以下のトークンを可視化できます。
+与えられた文章のperplexityを計算します。また予測確率が高いトークンは赤、低いトークンは青で表示されます。
 **利用する場合は、モデルロード時にlogits_allのチェックをつけてください。**
 
 ## Problem
