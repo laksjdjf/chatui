@@ -186,6 +186,8 @@ def generate(prompt):
         max_tokens=config.max_tokens,
         temperature=config.temperature,
         top_p=config.top_p,
+        min_p=config.min_p,
+        top_k=config.top_k,
         repeat_penalty=config.repeat_penalty,
         grammar=grammar,
         logits_processor=logits_processor,

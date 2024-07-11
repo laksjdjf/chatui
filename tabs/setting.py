@@ -48,6 +48,8 @@ def setting(model_dir):
             system = gr.Textbox(label="system", value="あなたは優秀なアシスタントです。", lines=2)
             temperature = gr.Slider(minimum=0, maximum=5, step=0.01, value=0.8, label="temperature")
             top_p = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.9, label="top_p")
+            min_p = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.05, label="min_p")
+            top_k = gr.Slider(minimum=1, maximum=256000, step=1, value=40, label="top_k")
             max_tokens = gr.Slider(minimum=1, maximum=256000, step=1, value=256, label="max_tokens")
             repeat_penalty = gr.Slider(minimum=1.0, maximum=2.0, step=0.01, value=1.0, label="repeat_penalty")
             with gr.Row():
@@ -64,10 +66,10 @@ def setting(model_dir):
             debug = gr.Checkbox(label="debug", value=False)
 
             output_load_config = gr.Textbox(label="output", interactive=False)
-            setting_list = [system, temperature, top_p, max_tokens, repeat_penalty, system_prefix, system_suffix, user_prefix, user_suffix, assistant_prefix, assistant_suffix, grammar, debug]
+            setting_list = [system, temperature, top_p, min_p, top_k, max_tokens, repeat_penalty, system_prefix, system_suffix, user_prefix, user_suffix, assistant_prefix, assistant_suffix, grammar, debug]
 
             template_dropdown = gr.Dropdown(template_list, label="template_list")
-            grammar_dropdown = gr.Dropdown(["list", "json", "japanese"], label="grammar_list")
+            grammar_dropdown = gr.Dropdown(["list", "json", "japanese", "problem_dict"], label="grammar_list")
 
         for setting in setting_list:
             setting.change(load_config, inputs=setting_list, outputs=output_load_config)

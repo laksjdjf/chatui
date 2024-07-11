@@ -5,6 +5,8 @@ class ChatConfig:
     system: str = "あなたは優秀なアシスタントです。"
     temperature: float = 0.8
     top_p: float = 0.9
+    min_p: float = 0.05
+    top_k: int = 40
     max_tokens: int = 256
     repeat_penalty: float = 1.0
     system_prefix: str = "<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>"
