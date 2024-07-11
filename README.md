@@ -89,3 +89,5 @@ Number of completionで会話の往復回数を設定できます。
 
 ## Tokenizer
 トークンがどう分割されているか、トークン長がいくつになるかわかります。トークンはBOSを含みます。
+
+元ネタ：https://huggingface.co/spaces/Xenova/the-tokenizer-playground
