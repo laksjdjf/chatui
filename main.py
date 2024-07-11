@@ -1,6 +1,7 @@
 import gradio as gr
 from tabs.setting import setting
 from tabs.chat import chat
+from tabs.playground import playground
 from tabs.completion import completion
 from tabs.likelihood import likelihood
 from tabs.eval_sentence import eval_sentence
@@ -25,6 +26,7 @@ if __name__ == "__main__":
     demo = gr.TabbedInterface(
         [
             chat(),
+            playground(),
             completion(),
             likelihood(),
             eval_sentence(),
@@ -37,6 +39,7 @@ if __name__ == "__main__":
         ], 
         [
             "Chat",
+            "Playground",
             "Completion",
             "Likelihood",
             "EvalSentence",
