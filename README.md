@@ -37,6 +37,9 @@ python main.py -m <gguf-directory>
 
 システムプロンプトはSettingタブにあるものではなく、チャット設定のsystemに従います。
 
+## Playground
+チャットと似てますが、交互にチャットする制限がなくなっています。その代わりすごい使いづらいです。
+
 ## Completion
 自由な入力ができるタブです。結果はEOSを除いて入力欄に直接追加されます。
 
