@@ -1,11 +1,15 @@
 import gradio as gr
-from tabs.setting import generate, get_prompt
-import faiss
+from modules.llama_process import generate, get_default_prompt
 import torch.nn.functional as F
 from torch import Tensor
 from transformers import AutoTokenizer, AutoModel
 import torch
 from tqdm import tqdm
+
+try:
+    import faiss
+except:
+    Warning("faiss is not installed. So you can't use rag tab.")
 
 try:
     from pdfminer.high_level import extract_text
@@ -137,7 +141,7 @@ def rag_handler(input, template, num_aug):
 
     augment = "\n".join([aug[0] for aug in rag_results[0]])
     prompt = template.format(augment=augment, input=input)
-    prompt = get_prompt(prompt)
+    prompt = get_default_prompt(prompt)
 
     output = ""
     yield gr.update(value=output), gr.update(value=prompt), gr.update(visible=False), gr.update(visible=True)

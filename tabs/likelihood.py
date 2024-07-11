@@ -1,5 +1,5 @@
 import gradio as gr
-from tabs.setting import eval_output, get_prompt
+from modules.llama_process import eval_output, get_prompt_from_messages, get_default_prompt
 import pandas as pd
 
 def likelihood_handler(prompt, *outputs):
@@ -12,16 +12,11 @@ def likelihood_handler(prompt, *outputs):
     )
 
     result = {output: likelihood for output, likelihood in zip(outputs, likelihoods)}
-
     return df.round(3), result
-
-def update_prompt(user, post_prompt=None):
-    prompt = get_prompt(user, post_prompt)
-    return gr.update(value=prompt, autoscroll=True)
 
 def likelihood():
     with gr.Blocks() as likelihood_interface:
-        gr.Markdown("テキスト評価用タブです。")
+        gr.Markdown("出力の尤度を計算するタブです。")
 
         with gr.Row():
             with gr.Column():
@@ -33,11 +28,10 @@ def likelihood():
                     lines=3,
                 )
                 
-                
                 default_button = gr.Button("Default")
                 eval_button = gr.Button("Evaluation", variant="primary")
 
-                user_textbox = gr.Textbox(label="input for default button", value="こんにちんぽ", lines=2)
+                user_textbox = gr.Textbox(label="input for default button", value="", lines=2)
                 with gr.Group():
                     targets = [
                         gr.Textbox(
@@ -56,7 +50,6 @@ def likelihood():
                 )
                 label = gr.Label("Result")
         
-
         eval_button.click(
             likelihood_handler,
             inputs=[prompt_textbox] + targets,
@@ -64,7 +57,7 @@ def likelihood():
         )
 
         default_button.click(
-            update_prompt,
+            get_default_prompt,
             inputs=[user_textbox],
             outputs=[prompt_textbox],
         )
