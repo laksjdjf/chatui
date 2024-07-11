@@ -8,6 +8,7 @@ from tabs.problem import problem
 from tabs.arena import arena
 from tabs.rag import rag
 from tabs.ai2ai import ai2ai
+from tabs.tokenizer import tokenizer
 import os
 
 if __name__ == "__main__":
@@ -31,6 +32,7 @@ if __name__ == "__main__":
             arena(),
             rag(),
             ai2ai(),
+            tokenizer(),
             setting(args.model_dir),
         ], 
         [
@@ -42,6 +44,7 @@ if __name__ == "__main__":
             "Arena",
             "RAG",
             "AI2AI",
+            "Tokenizer",
             "Setting",
         ],
         theme=gr.themes.Base()

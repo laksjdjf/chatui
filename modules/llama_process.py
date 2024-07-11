@@ -28,6 +28,23 @@ cjk         ::= [一-龯]
 space       ::= [ \t\n]
 """
 
+PROBLEM_DICT_GBNF = r"""
+root   ::= object
+
+object ::=
+  "{" ws "\"reason\"" ws ":" ws string "," ws "\"answer\"" ws ":" ws answer "}" ws
+
+string ::=
+  "\"" (
+    [^"\\\x7F\x00-\x1F] |
+    "\\" (["\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]) # escapes
+  )* "\"" ws
+
+answer ::= "\"" ("A" | "B" | "C" | "D" | "E") "\"" ws
+
+ws ::= ([ \t\n] ws)?
+"""
+
 # Chat GPTに作らせたので、よくわからない。
 PATTERNS = {
     'ひらがな': '[\u3040-\u309F]',
@@ -53,6 +70,8 @@ def get_gbnf(template):
         return LIST_GBNF
     elif template == "json":
         return JSON_GBNF
+    elif template == "problem_dict":
+        return PROBLEM_DICT_GBNF
     else:
         return ""
     
@@ -274,3 +293,20 @@ def eval_choice(input: str, choices: list):
 
     choice = model._scores[-1][output_tokens].argmax()
     return choices[choice]
+
+def get_token_split(text: str):
+    global model
+    tokens = model.tokenize(text.encode("utf-8"), special=True)
+    text_splited = ""
+    for i in range(1, len(tokens)):
+        try:
+            word = model.detokenize([tokens[i]], prev_tokens=tokens[:i]).decode("utf-8")
+        except:
+            word = "◆"
+        color = ["plum", "lightgreen", "yellow", "pink", "lightblue"][i % 5]
+        if word == "\n":
+            text_splited += "\n\n"
+        else:
+            text_splited += f"<span style='background-color:{color}'>{word}</span> "
+
+    return text_splited, str(tokens), f"# Tokens {len(tokens)}   Characters {len(text)}"
