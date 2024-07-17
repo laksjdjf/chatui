@@ -1,4 +1,5 @@
 from llama_cpp import Llama, LogitsProcessor
+from llama_cpp.llama_chat_format import Llava15ChatHandler, Llava16ChatHandler
 from llama_cpp.llama_grammar import LlamaGrammar, JSON_GBNF, LIST_GBNF
 from llama_cpp.llama_cpp import GGML_TYPE_Q4_0, GGML_TYPE_Q8_0, GGML_TYPE_F16
 from modules.config import ChatConfig
@@ -45,6 +46,22 @@ answer ::= "\"" ("A" | "B" | "C" | "D" | "E") "\"" ws
 ws ::= ([ \t\n] ws)?
 """
 
+ELYZA_EVAL_GBNF = r"""
+root   ::= object
+
+object ::=
+  "{" "\"reason\"" ":" ws string "," "\"grade\"" ":" grade "}"
+string ::=
+  "\"" (
+    [^"\\\x7F\x00-\x1F] |
+    "\\" (["\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]) # escapes
+  )* "\"" ws
+
+grade ::= "\"" ("1" | "2" | "3" | "4" | "5") "\"" ws
+
+ws ::= ([ \t\n] ws)?
+"""
+
 # Chat GPTに作らせたので、よくわからない。
 PATTERNS = {
     'ひらがな': '[\u3040-\u309F]',
@@ -72,6 +89,8 @@ def get_gbnf(template):
         return JSON_GBNF
     elif template == "problem_dict":
         return PROBLEM_DICT_GBNF
+    elif template == "elyza_eval":
+        return ELYZA_EVAL_GBNF
     else:
         return ""
     
@@ -122,15 +141,28 @@ def load_logits_processor(languages):
             return f"Number of ban tokens: {len(ban_ids)}"
     logits_processor = None
     return "No languages selected."
+
+def load_llava_handler(llava_handler, mmproj_path):
+    if llava_handler == "Llava16ChatHandler":
+        return Llava16ChatHandler(clip_model_path=mmproj_path)
+    elif llava_handler == "Llava15ChatHandler":
+        return Llava15ChatHandler(clip_model_path=mmproj_path)
+    return None
     
-def load_model(model_dir, model_name, ngl, ctx, ts, n_batch, flash_attn, no_kv_offload, type_kv, logits_all):
+def load_model(model_dir, model_name, mmproj_name, llava_handler, lora_name, ngl, ctx, ts, n_batch, flash_attn, no_kv_offload, type_kv, logits_all):
     global model
     del model
     model = None # error handling
     model_path = os.path.join(model_dir, model_name)
+    mmproj_path = os.path.join(model_dir, "mmprojs", mmproj_name) if mmproj_name != "None" else None
+    llava_handler = load_llava_handler(llava_handler, mmproj_path)
+    lora_path = os.path.join(model_dir, "loras", lora_name) if lora_name != "None" else None
+
     ts = [float(x) for x in ts.split(",")] if ts else None
     model = Llama(
         model_path=model_path,
+        chat_handler=llava_handler,
+        lora_path=lora_path,
         n_gpu_layers=ngl,
         n_batch=n_batch,
         tensor_split=ts,
@@ -165,10 +197,10 @@ def get_n_tokens():
 def get_prompt_from_messages(messages, input_message, add_system=False):
     return config.get_prompt_from_messages(messages, input_message, add_system=add_system)
 
-def get_default_prompt(user):
+def get_default_prompt(user, add_system=True):
     messages = [{"role": "user", "content": user}]
     input_message = {"role": "assistant", "content": ""}
-    prompt = get_prompt_from_messages(messages, input_message, add_system=True)
+    prompt = get_prompt_from_messages(messages, input_message, add_system=add_system)
     return prompt
 
 def generate(prompt):
@@ -194,6 +226,32 @@ def generate(prompt):
         stream=True,
     ):
         yield chunk["choices"][0]["text"]
+
+def generate_chat(messages):
+    global model, config, logits_processor
+    if config.debug:
+        print(f"Prompt: {messages}")
+
+    if config.grammar:
+        grammar = LlamaGrammar.from_string(config.grammar)
+    else:
+        grammar = None
+
+    for chunk in model.create_chat_completion(
+        messages,
+        max_tokens=config.max_tokens,
+        temperature=config.temperature,
+        top_p=config.top_p,
+        min_p=config.min_p,
+        top_k=config.top_k,
+        repeat_penalty=config.repeat_penalty,
+        grammar=grammar,
+        logits_processor=logits_processor,
+        stream=True,
+    ):
+        delta = chunk["choices"][0]["delta"]
+        if "content" in delta:
+            yield delta["content"]
 
 def find_first_difference_index(list1, list2):
     min_length = min(len(list1), len(list2))

@@ -10,6 +10,8 @@ from tabs.arena import arena
 from tabs.rag import rag
 from tabs.ai2ai import ai2ai
 from tabs.tokenizer import tokenizer
+from tabs.multimodal import multimodal
+from tabs.questions import questions
 import os
 
 if __name__ == "__main__":
@@ -28,9 +30,11 @@ if __name__ == "__main__":
             chat(),
             playground(),
             completion(),
+            multimodal(),
             likelihood(),
             eval_sentence(),
             problem(),
+            questions(),
             arena(),
             rag(),
             ai2ai(),
@@ -41,9 +45,11 @@ if __name__ == "__main__":
             "Chat",
             "Playground",
             "Completion",
+            "Multimodal",
             "Likelihood",
             "EvalSentence",
             "Problem",
+            "Questions",
             "Arena",
             "RAG",
             "AI2AI",
