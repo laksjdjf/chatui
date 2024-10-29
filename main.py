@@ -21,9 +21,13 @@ if __name__ == "__main__":
     os.makedirs("output", exist_ok=True)
     
     parser = argparse.ArgumentParser()
-    parser.add_argument("--share", action="store_true")
+    parser.add_argument("--share", "-s", action="store_true")
     parser.add_argument("--model_dir", "-m", help="path to model directory")
+    parser.add_argument("--disable_graph", "-dg", action="store_true")
     args = parser.parse_args()
+    
+    if args.disable_graph:
+        os.environ["GGML_CUDA_DISABLE_GRAPHS"] = "1" 
 
     demo = gr.TabbedInterface(
         [
